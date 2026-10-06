@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <path d="M20 17.5 23.5 6h17L44 17.5" fill="url(#hat-crown)" stroke="#8A623B" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M22 14.5h20" stroke="#1B2026" stroke-width="3"/>
+  <path d="M13 18.5c8.5-1.8 29.5-1.8 38 0" stroke="#8A623B" stroke-width="4" stroke-linecap="round"/>
+  <rect x="13" y="19" width="38" height="38" rx="12" fill="url(#face)" stroke="#4F8EF7" stroke-width="2"/>
+  <path d="M20 25c7-4 17-4 24 0" stroke="#7BC6FF" stroke-opacity=".16" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="25" cy="38" r="2.6" fill="#7BC6FF"/>
+  <circle cx="39" cy="38" r="2.6" fill="#7BC6FF"/>
+  <path d="M27.5 47h9" stroke="#7BC6FF" stroke-opacity=".65" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="45" cy="27" r="2.2" fill="#D6A24A"/>
+  <defs>
+    <linearGradient id="hat-crown" x1="22" y1="6" x2="42" y2="18" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8A623B"/>
+      <stop offset=".55" stop-color="#5B3C24"/>
+      <stop offset="1" stop-color="#3E291C"/>
+    </linearGradient>
+    <linearGradient id="face" x1="18" y1="21" x2="47" y2="55" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#203B59"/>
+      <stop offset="1" stop-color="#111C29"/>
+    </linearGradient>
+  </defs>
+</svg>

@@ -7,6 +7,15 @@ const examples = {
   escalation: 'Explícame de forma breve cómo debería manejar una aplicación la renovación segura de tokens cuando una sesión expira.',
 }
 
+const DEMO_DEBUG = true
+
+const quickPrompts = [
+  { label: 'Analiza este código', prompt: examples.code },
+  { label: 'Resume un documento', prompt: 'Resume este documento técnico e identifica sus decisiones principales, dependencias y riesgos.' },
+  { label: 'Ayúdame con un error', prompt: 'Ayúdame a diagnosticar un error 401 en una API y propón pasos concretos para resolverlo.' },
+  { label: 'Diseña una arquitectura', prompt: 'Diseña una arquitectura de software escalable, identifica sus componentes, dependencias y riesgos.' },
+]
+
 const providerCatalog = {
   openai: {
     name: 'OpenAI',
@@ -134,16 +143,40 @@ function formatSaving(estimatedCost, baselineCost, escalated = false) {
   return escalated ? `${percentage.toFixed(1)}%` : `${Math.round(percentage)}%`
 }
 
+function estimateTokensForDemo(prompt, complexity, tier) {
+  const promptTokens = Math.max(80, Math.ceil(prompt.length / 4))
+  const complexityMultiplier = { low: 4, medium: 9, high: 18 }[complexity] || 4
+  const tierRatio = { efficient: 0.58, balanced: 0.72, premium: 0.86 }[tier] || 0.72
+  const premium = Math.max(500, Math.round((promptTokens * complexityMultiplier + 700) / 100) * 100)
+  const optiRoute = Math.max(300, Math.round((premium * tierRatio) / 100) * 100)
+  const avoided = Math.max(0, Math.round((1 - optiRoute / premium) * 100))
+
+  return { premium, optiRoute, avoided }
+}
+
+function formatTokenEstimate(value) {
+  return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(value)
+}
+
 function createRoute(model, classification, activeAgent, options = {}) {
   const provider = providerCatalog[model.provider]
   const estimatedCost = options.estimatedCost ?? model.estimatedCost
-  const reference = getPremiumReference(activeAgent, model.complexity)
+  const referenceComplexity = complexityOrder[
+    Math.max(
+      complexityOrder.indexOf(classification.complexity),
+      complexityOrder.indexOf(model.complexity),
+    )
+  ]
+  const reference = getPremiumReference(activeAgent, referenceComplexity)
   const restricted = activeAgent !== 'global'
   const escalated = options.escalated === true
+  const mode = options.mode || 'auto'
 
   let reason
 
-  if (escalated) {
+  if (mode === 'manual') {
+    reason = `El usuario seleccionó manualmente ${provider.name} · ${model.name}. OptiRoute mantuvo esta elección durante la verificación.`
+  } else if (escalated) {
     reason = restricted
       ? `La verificación inicial no fue superada. OptiRoute escaló dentro de ${provider.name} sin salir del proveedor permitido.`
       : `La verificación inicial no fue superada. OptiRoute escaló de ${options.initialProviderName} a ${provider.name} para aumentar la capacidad de la ruta.`
@@ -157,11 +190,12 @@ function createRoute(model, classification, activeAgent, options = {}) {
     provider: model.provider,
     providerName: provider.name,
     contextAgent: activeAgent,
+    mode,
     model: model.name,
     modelId: model.id,
     tier: model.tier,
-    complexity: complexityLabels[model.complexity],
-    complexityId: model.complexity,
+    complexity: complexityLabels[classification.complexity],
+    complexityId: classification.complexity,
     taskType: classification.type,
     intent: classification.intent,
     estimatedCost: formatCost(estimatedCost),
@@ -176,6 +210,13 @@ function createRoute(model, classification, activeAgent, options = {}) {
     initialProviderName: options.initialProviderName,
     initialCost: options.initialCost,
   }
+}
+
+function selectManualRoute(classification, activeAgent, modelId) {
+  const allowedModel = getAvailableModels(activeAgent).find((model) => model.id === modelId)
+  return allowedModel
+    ? createRoute(allowedModel, classification, activeAgent, { mode: 'manual' })
+    : selectRoute(classification, activeAgent)
 }
 
 function selectRoute(classification, activeAgent) {
@@ -458,7 +499,7 @@ function classifyTask(userMessage) {
   }
 
   if (
-    /documento largo|documentacion extensa|documentacion tecnica extensa|analisis profundo|informe completo|analiza este documento|analizar este documento|resumir documento|resumen de este documento|dependencias y riesgos|analizar documentacion|analisis documental/.test(normalizedMessage)
+    /documento largo|documentacion extensa|documentacion tecnica extensa|analisis profundo|informe completo|analiza este documento|analizar este documento|resumir documento|resumen de este documento|dependencias y riesgos|analizar documentacion|analisis documental|disena una arquitectura|arquitectura de software/.test(normalizedMessage)
   ) {
     return { type: 'long-document', complexity: 'high', intent: 'analysis' }
   }
@@ -530,6 +571,7 @@ const initialSessionStats = {
 function createEmptyWorkspace() {
   return {
     message: '',
+    modelPreference: 'auto',
     messages: [],
     route: null,
     processing: false,
@@ -575,10 +617,156 @@ function getAgentChatLabel(agentId) {
   return agent.id === 'global' ? 'OptiRoute' : `${agent.name} Agent`
 }
 
+function ModelPicker({ activeAgent, value, open, onToggle, onChange, disabled }) {
+  const selectedModel = value === 'auto' ? null : getModelById(value)
+  const providers = activeAgent === 'global'
+    ? Object.entries(providerCatalog)
+    : [[activeAgent, providerCatalog[activeAgent]]]
+
+  return (
+    <div className="model-picker relative z-40">
+      {open && (
+        <button
+          type="button"
+          aria-label="Cerrar selector de modelo"
+          className="fixed inset-0 z-[-1] cursor-default"
+          onClick={onToggle}
+        />
+      )}
+
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={onToggle}
+        className="flex max-w-[260px] items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.025] px-3 py-2 text-left text-[11px] text-[#B8BBC0] transition-[border-color,background-color,color] duration-150 hover:border-white/[0.14] hover:bg-white/[0.045] hover:text-[#ECEDEB] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <span className="text-[#D6A24A]">✦</span>
+        <span className="truncate">{selectedModel ? selectedModel.name : 'OptiRoute Auto'}</span>
+        <svg aria-hidden="true" viewBox="0 0 12 12" className={`ml-auto h-3 w-3 shrink-0 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}>
+          <path d="m3 4.5 3 3 3-3" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div role="listbox" aria-label="Preferencia de modelo" className="model-picker__popover absolute bottom-[calc(100%+10px)] left-0 z-50 max-h-[360px] w-[min(380px,calc(100vw-48px))] overflow-y-auto rounded-xl border border-white/[0.1] bg-[#0D1014]/[0.98] p-2 shadow-[0_18px_60px_rgba(0,0,0,0.48)] backdrop-blur-xl">
+          <button
+            type="button"
+            role="option"
+            aria-selected={value === 'auto'}
+            onClick={() => onChange('auto')}
+            className={`w-full rounded-lg border px-3 py-3 text-left transition-colors duration-150 ${
+              value === 'auto'
+                ? 'border-[#D6A24A]/20 bg-[#D6A24A]/[0.06]'
+                : 'border-transparent hover:bg-white/[0.035]'
+            }`}
+          >
+            <span className="flex items-center justify-between gap-3">
+              <span className="text-xs font-medium text-[#F0F0ED]">✦ OptiRoute Auto</span>
+              <span className="rounded border border-[#D6A24A]/20 bg-[#D6A24A]/[0.06] px-1.5 py-0.5 text-[8px] uppercase tracking-[0.12em] text-[#D6A24A]/80">Recomendado</span>
+            </span>
+            <span className="mt-1 block text-[10px] leading-4 text-white/35">Selecciona automáticamente la ruta más eficiente</span>
+          </button>
+
+          {providers.map(([providerId, provider]) => (
+            <div key={providerId} className="mt-3 border-t border-white/[0.06] pt-3">
+              <p className="px-3 text-[8px] uppercase tracking-[0.18em] text-white/25">{provider.name}</p>
+              <div className="mt-1 space-y-0.5">
+                {provider.models.map((model) => (
+                  <button
+                    key={model.id}
+                    type="button"
+                    role="option"
+                    aria-selected={value === model.id}
+                    onClick={() => onChange(model.id)}
+                    className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-150 ${
+                      value === model.id ? 'bg-white/[0.06] text-[#F3F2EE]' : 'text-[#A1A6AE] hover:bg-white/[0.035] hover:text-[#E5E6E3]'
+                    }`}
+                  >
+                    <span className="truncate text-[11px]">{model.name}</span>
+                    <span className="shrink-0 text-[8px] uppercase tracking-[0.12em] text-white/25">{complexityLabels[model.complexity]}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ImpactPanel({ route, routeStage, sessionStats, budget }) {
+  const hasResult = route && routeStage === 'verified'
+
+  if (!hasResult) {
+    return (
+      <aside className="impact-panel glass-card rounded-2xl border p-5">
+        <p className="text-[11px] uppercase tracking-[0.2em] text-[#A1A6AE]">Impacto OptiRoute</p>
+        <p className="mt-1 text-[8px] uppercase tracking-[0.16em] text-white/25">Estimaciones de demostración</p>
+        <p className="mt-5 text-xs leading-5 text-[#6F757D]">Envía una tarea para comparar costo y eficiencia.</p>
+      </aside>
+    )
+  }
+
+  const premiumCost = parseCost(route.baselineCost)
+  const optiCost = parseCost(route.estimatedCost)
+  const costRatio = premiumCost > 0 ? Math.min((optiCost / premiumCost) * 100, 100) : 0
+  const projectionCount = 1000
+  const premiumProjected = premiumCost * projectionCount
+  const optiProjected = optiCost * projectionCount
+  const savingsProjected = premiumProjected - optiProjected
+  const tokens = route.demoTokens || estimateTokensForDemo('', route.complexityId, route.tier)
+
+  return (
+    <aside className="impact-panel glass-card rounded-2xl border p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.2em] text-[#A1A6AE]">Impacto OptiRoute</p>
+          <p className="mt-1 text-[8px] uppercase tracking-[0.16em] text-white/25">Estimaciones de demostración</p>
+        </div>
+        <span className="text-lg font-medium text-[#D6A24A]/85">{route.saving}</span>
+      </div>
+
+      <section className="mt-5 border-t border-white/[0.06] pt-4">
+        <div className="flex items-center justify-between text-[10px]"><span className="text-white/35">Referencia premium</span><span className="text-white/70">{route.baselineCost}</span></div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.045]"><div className="h-full w-full rounded-full bg-white/20" /></div>
+        <div className="mt-4 flex items-center justify-between text-[10px]"><span className="text-white/35">OptiRoute</span><span className="text-white/80">{route.estimatedCost}</span></div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.045]"><div className="impact-bar h-full rounded-full bg-[rgba(210,158,67,0.78)]" style={{ width: `${costRatio}%` }} /></div>
+      </section>
+
+      <section className="mt-5 grid grid-cols-3 gap-3 border-t border-white/[0.06] pt-4">
+        <div><p className="text-[8px] uppercase tracking-[0.12em] text-white/25">Referencia</p><p className="mt-1 text-xs text-white/65">{formatTokenEstimate(tokens.premium)}</p></div>
+        <div><p className="text-[8px] uppercase tracking-[0.12em] text-white/25">OptiRoute</p><p className="mt-1 text-xs text-white/75">{formatTokenEstimate(tokens.optiRoute)}</p></div>
+        <div><p className="text-[8px] uppercase tracking-[0.12em] text-white/25">Evitados</p><p className="mt-1 text-xs text-[#D6A24A]/80">{tokens.avoided}%</p></div>
+        <p className="col-span-3 text-[8px] uppercase tracking-[0.14em] text-white/20">Tokens estimados · demo</p>
+      </section>
+
+      <section className="mt-5 border-t border-white/[0.06] pt-4">
+        <p className="text-[8px] uppercase tracking-[0.16em] text-white/25">Proyección · 1.000 solicitudes similares</p>
+        <div className="mt-3 grid grid-cols-3 gap-3">
+          <div><p className="text-[8px] text-white/25">Referencia</p><p className="mt-1 text-[11px] text-white/65">${premiumProjected.toFixed(2)}</p></div>
+          <div><p className="text-[8px] text-white/25">OptiRoute</p><p className="mt-1 text-[11px] text-white/75">${optiProjected.toFixed(2)}</p></div>
+          <div><p className="text-[8px] text-white/25">Ahorro</p><p className="mt-1 text-[11px] text-[#D6A24A]/80">${savingsProjected.toFixed(2)}</p></div>
+        </div>
+      </section>
+
+      <section className="mt-5 border-t border-white/[0.06] pt-4">
+        <p className="text-[8px] uppercase tracking-[0.16em] text-white/25">Presupuesto</p>
+        <div className="mt-2 flex items-center justify-between text-[10px]"><span className="text-white/35">Disponible</span><span className="text-white/70">{formatCost(budget)}</span></div>
+        <div className="mt-1.5 flex items-center justify-between text-[10px]"><span className="text-white/35">Consumo actual</span><span className="text-white/70">{formatCost(sessionStats.optiRouteCost)}</span></div>
+        <div className="mt-1.5 flex items-center justify-between text-[10px]"><span className="text-white/35">Preservado</span><span className="text-[#D6A24A]/75">{formatCost(sessionStats.savings)}</span></div>
+      </section>
+    </aside>
+  )
+}
+
 function App() {
   const [activeAgent, setActiveAgent] = useState('global')
   const [agentWorkspaces, setAgentWorkspaces] = useState(createAgentWorkspaces)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [modelMenuOpen, setModelMenuOpen] = useState(false)
   const sessionGenerations = useRef(
     Object.fromEntries(agents.map((agent) => [agent.id, 0])),
   )
@@ -586,6 +774,7 @@ function App() {
   const activeWorkspace = agentWorkspaces[activeAgent]
   const {
     message,
+    modelPreference,
     messages,
     route,
     processing,
@@ -616,6 +805,7 @@ function App() {
   }
 
   const setMessage = (value) => setActiveWorkspaceField('message', value)
+  const setModelPreference = (value) => setActiveWorkspaceField('modelPreference', value)
   const setMessages = (value) => setActiveWorkspaceField('messages', value)
   const setRoute = (value) => setActiveWorkspaceField('route', value)
   const setProcessing = (value) => setActiveWorkspaceField('processing', value)
@@ -671,6 +861,8 @@ function App() {
 
     const userMessage = message.trim()
     const requestAgent = activeAgent
+    const requestModelPreference = modelPreference
+    const isAutoMode = requestModelPreference === 'auto'
     const activeGeneration = sessionGenerations.current[requestAgent]
     const isEscalation = userMessage === examples.escalation
 
@@ -684,19 +876,22 @@ function App() {
     setMessage('')
     setProcessing(true)
     setRouteStage('analyzing')
+    setModelMenuOpen(false)
 
     await new Promise((resolve) => setTimeout(resolve, 400))
 
     if (activeGeneration !== sessionGenerations.current[requestAgent]) return
 
     const classification = classifyTask(userMessage)
-    const initialRoute = selectRoute(classification, activeAgent)
+    const initialRoute = isAutoMode
+      ? selectRoute(classification, requestAgent)
+      : selectManualRoute(classification, requestAgent, requestModelPreference)
     setRoute(initialRoute)
     setRouteStage('selected')
 
     let selectedRoute
 
-    if (isEscalation) {
+    if (isEscalation && isAutoMode) {
       await new Promise((resolve) => setTimeout(resolve, 400))
       if (activeGeneration !== sessionGenerations.current[requestAgent]) return
 
@@ -713,7 +908,7 @@ function App() {
         if (activeGeneration !== sessionGenerations.current[requestAgent]) return
       }
 
-      selectedRoute = escalateRoute(classification, activeAgent, initialRoute)
+      selectedRoute = escalateRoute(classification, requestAgent, initialRoute)
       setRoute(selectedRoute)
       setRouteStage('verifying')
 
@@ -730,8 +925,17 @@ function App() {
       selectedRoute = {
         ...initialRoute,
         escalated: false,
-        verification: 'Superada',
+        verification: isEscalation ? 'No superada' : 'Superada',
       }
+    }
+
+    selectedRoute = {
+      ...selectedRoute,
+      demoTokens: estimateTokensForDemo(
+        userMessage,
+        selectedRoute.complexityId,
+        selectedRoute.tier,
+      ),
     }
 
     const estimatedCost = parseCost(selectedRoute.estimatedCost)
@@ -765,6 +969,8 @@ function App() {
         model: selectedRoute.model,
         provider: selectedRoute.provider,
         providerName: selectedRoute.providerName,
+        mode: selectedRoute.mode,
+        modelPreference: requestModelPreference,
         complexity: selectedRoute.complexity,
         estimatedCost,
         baselineCost,
@@ -814,11 +1020,16 @@ function App() {
   return (
     <div className="app-shell min-h-screen overflow-x-hidden text-[#F3F2EE]">
       <header className="h-16 border-b border-white/[0.08] bg-[#0D0F12]/85 backdrop-blur-xl">
-        <div className="mx-auto flex h-full max-w-[1400px] items-center justify-between px-5 sm:px-8">
-          <div className="flex items-center gap-3 text-sm">
+        <div className="flex h-full w-full items-center justify-between px-7 sm:px-8 lg:px-9">
+          <div className="flex items-center gap-2.5 text-sm">
             <span className="font-medium">IneBrain</span>
             <span className="text-[#626467]">/</span>
-            <OptiRouteMascot size="xs" />
+            <OptiRouteMascot
+              size="xs"
+              accessory={agents[0].avatar.accessory}
+              mood={agents[0].avatar.mood}
+              className="header-opti-mascot"
+            />
             <span className="text-[#A0A1A3]">OptiRoute</span>
             <span className="rounded border border-white/[0.08] bg-white/[0.03] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.08em] text-[#626467]">
               DEMO
@@ -828,11 +1039,11 @@ function App() {
           <button
             onClick={() => setHistoryOpen(true)}
             aria-expanded={historyOpen}
-            className="history-trigger group relative flex items-center gap-2 px-1 py-2 text-sm text-[#A1A6AE] transition-colors duration-[160ms] hover:text-[#F3F2EE]"
+            className="history-trigger group relative flex items-center gap-[7px] px-1 py-2 text-[14px] font-medium text-white/65 transition-colors duration-[160ms] hover:text-white/95"
           >
             <span>Historial</span>
             {history.length > 0 && (
-              <span className="history-counter rounded-md border border-[#D6A24A]/20 bg-[#D6A24A]/[0.07] px-1.5 py-0.5 text-[9px] leading-none text-[#D6A24A]/80 transition-opacity duration-[160ms] group-hover:opacity-100">
+              <span className="history-counter inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full border border-[#D6A24A]/20 bg-[#D6A24A]/[0.07] px-1 text-[9px] leading-none text-[#D6A24A]/80 transition-[border-color,background-color,color] duration-[160ms] group-hover:border-[#D6A24A]/30 group-hover:bg-[#D6A24A]/[0.1] group-hover:text-[#D6A24A]">
                 {history.length}
               </span>
             )}
@@ -843,7 +1054,10 @@ function App() {
       <div className="workspace-layout">
         <AgentHub
           activeAgent={activeAgent}
-          onSelectAgent={setActiveAgent}
+          onSelectAgent={(agentId) => {
+            setModelMenuOpen(false)
+            setActiveAgent(agentId)
+          }}
           onNewSession={handleNewSessionPlaceholder}
           selectionDisabled={processing}
         />
@@ -863,9 +1077,24 @@ function App() {
               <p className="text-[11px] uppercase tracking-[0.18em] text-[#626467]">
                 Nueva conversación
               </p>
-              <div className="hidden text-right md:block">
-                <p className="text-[8px] uppercase tracking-[0.18em] text-white/25">Agente</p>
-                <p className="mt-0.5 text-[10px] text-white/45">{selectedAgent.name}</p>
+              <div
+                key={activeAgent}
+                className={`active-agent-context active-agent-context--${selectedAgent.avatar.color} hidden md:flex`}
+                aria-label={`Agente activo: ${selectedAgent.name}`}
+              >
+                <AgentAvatar
+                  {...selectedAgent.avatar}
+                  size="xs"
+                  active
+                  className="active-agent-context__avatar"
+                />
+                <div className="min-w-0 text-left">
+                  <p className="active-agent-context__label">Agente activo</p>
+                  <div className="active-agent-context__name-row">
+                    <span className="active-agent-context__accent" />
+                    <p className="active-agent-context__name">{selectedAgent.name}</p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -972,62 +1201,68 @@ function App() {
               className="h-[112px] w-full resize-none overflow-x-hidden bg-transparent p-3 text-[15px] text-[#F4F4F2] outline-none placeholder:text-[#626467]"
             />
 
-            <div className="flex justify-end">
+            <div className="flex items-end justify-between gap-3">
+              <ModelPicker
+                activeAgent={activeAgent}
+                value={modelPreference}
+                open={modelMenuOpen}
+                disabled={processing}
+                onToggle={() => setModelMenuOpen((current) => !current)}
+                onChange={(value) => {
+                  setModelPreference(value)
+                  setModelMenuOpen(false)
+                }}
+              />
+
               <button
+                type="button"
                 onClick={sendMessage}
                 disabled={processing}
-                className="rounded-[10px] border border-white/15 bg-[#F1F1EE] px-4 py-2 text-sm font-medium text-[#111214] shadow-[0_0_20px_rgba(123,198,255,0.08)] transition-[background-color,border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-white/25 hover:bg-white hover:shadow-[0_0_26px_rgba(123,198,255,0.14)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Enviar mensaje"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-[#F1F1ED] text-[#0B0D10] shadow-[0_0_20px_rgba(123,198,255,0.08)] transition-[background-color,border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-white/25 hover:bg-white hover:shadow-[0_0_26px_rgba(123,198,255,0.14)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7BC6FF]/15 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 md:h-[42px] md:w-[42px]"
               >
-                {processing ? 'Analizando...' : 'Enviar ↑'}
+                {processing ? (
+                  <span className="flex items-center gap-0.5" aria-hidden="true">
+                    <span className="processing-dot h-1 w-1 rounded-full bg-[#0B0D10]" />
+                    <span className="processing-dot h-1 w-1 rounded-full bg-[#0B0D10]" />
+                    <span className="processing-dot h-1 w-1 rounded-full bg-[#0B0D10]" />
+                  </span>
+                ) : (
+                  <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4.5 w-4.5">
+                    <path d="M10 15V5m0 0L6.5 8.5M10 5l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
               </button>
             </div>
           </div>
 
-          <div className="mt-4 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 text-[11px] text-[#626467]">
-            <span>Prueba con:</span>
+          <div className="quick-prompts mt-4 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 text-[11px] text-[#626467]">
+            <span>Sugerencias:</span>
+            {quickPrompts.map((quickPrompt) => (
+              <button
+                key={quickPrompt.label}
+                type="button"
+                onClick={() => setMessage(quickPrompt.prompt)}
+                className="quick-prompt cursor-pointer rounded-full border border-white/[0.07] bg-white/[0.025] px-2.5 py-1 text-[#797E85] transition-[color,border-color,background-color] duration-200 hover:border-[#D6A24A]/[0.22] hover:bg-white/[0.055] hover:text-[#E7E7E4]"
+              >
+                {quickPrompt.label}
+              </button>
+            ))}
 
-            <button
-              onClick={() => setMessage(examples.short)}
-              className="cursor-pointer rounded-full border border-white/[0.07] bg-white/[0.025] px-2.5 py-1 text-[#797E85] transition-[color,border-color,background-color] duration-200 hover:border-[#D6A24A]/[0.22] hover:bg-white/[0.055] hover:text-[#E7E7E4]"
-            >
-              Pregunta corta
-            </button>
-
-            <span>·</span>
-
-            <button
-              onClick={() => setMessage(examples.code)}
-              className="cursor-pointer rounded-full border border-white/[0.07] bg-white/[0.025] px-2.5 py-1 text-[#797E85] transition-[color,border-color,background-color] duration-200 hover:border-[#D6A24A]/[0.22] hover:bg-white/[0.055] hover:text-[#E7E7E4]"
-            >
-              Analizar código
-            </button>
-
-            <span>·</span>
-
-            <button
-              onClick={() => setMessage(examples.document)}
-              className="cursor-pointer rounded-full border border-white/[0.07] bg-white/[0.025] px-2.5 py-1 text-[#797E85] transition-[color,border-color,background-color] duration-200 hover:border-[#D6A24A]/[0.22] hover:bg-white/[0.055] hover:text-[#E7E7E4]"
-            >
-              Documento largo
-            </button>
-
-            <span>·</span>
-
-            <button
-              onClick={() => setMessage(examples.escalation)}
-              className="cursor-pointer rounded-full border border-[#D6A24A]/[0.18] bg-[#D6A24A]/[0.035] px-2.5 py-1 text-[#797E85] transition-[color,border-color,background-color] duration-200 hover:border-[#D6A24A]/30 hover:bg-[#D6A24A]/[0.07] hover:text-[#E7E7E4]"
-            >
-              Probar escalamiento
-            </button>
+            {DEMO_DEBUG && (
+              <button
+                type="button"
+                onClick={() => setMessage(examples.escalation)}
+                className="ml-auto cursor-pointer px-1 py-1 text-[9px] uppercase tracking-[0.12em] text-white/20 transition-colors duration-150 hover:text-[#D6A24A]/60"
+              >
+                Demo: escalamiento
+              </button>
+            )}
           </div>
         </section>
 
-        <div className="w-full min-w-0 md:flex md:h-full md:min-h-0 md:flex-col">
-          <aside className={`route-panel h-fit rounded-2xl border border-white/[0.08] bg-[#0D0F12] p-6 transition-[border-color,max-height,opacity] duration-[380ms] md:h-auto md:min-h-0 ${
-            routeStage !== 'idle'
-              ? 'route-panel-enter md:max-h-full md:flex-1 md:overflow-y-auto'
-              : 'md:max-h-[250px] md:flex-none md:overflow-hidden'
-          }`}>
+        <div className="right-column w-full min-w-0 md:h-full md:min-h-0 md:pr-1">
+          <aside className={`route-panel glass-card h-fit rounded-2xl border p-6 ${routeStage !== 'idle' ? 'route-panel-enter' : ''}`}>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.2em] text-[#A1A6AE]">
@@ -1043,10 +1278,20 @@ function App() {
                     {selectedAgent.id === 'global' ? 'Global' : selectedAgent.name}
                   </span>
                 </div>
+                <div className="mt-1.5 flex items-center gap-2 text-[9px] uppercase tracking-[0.14em]">
+                  <span className="text-white/25">Modo</span>
+                  <span className="h-px w-3 bg-white/[0.08]" />
+                  <span className="normal-case tracking-normal text-white/45">
+                    {(route?.mode || (modelPreference === 'auto' ? 'auto' : 'manual')) === 'auto'
+                      ? 'OptiRoute Auto'
+                      : 'Selección manual'}
+                  </span>
+                </div>
               </div>
 
               <OptiRouteMascot
                 size="lg"
+                accessory={agents[0].avatar.accessory}
                 active={routeStage !== 'idle' && routeStage !== 'verified'}
                 mood={routeStage === 'analyzing' || routeStage === 'verifying' || routeStage === 'escalating' ? 'focused' : 'neutral'}
                 className={
@@ -1227,7 +1472,12 @@ function App() {
                     ) : (
                       <div>
                         <p className="text-[9px] uppercase tracking-[0.14em] text-[#6F757D]">Verificación</p>
-                        <p className="mt-2 flex items-center gap-2 text-sm font-medium"><span className="h-1.5 w-1.5 rounded-full bg-[#D6A24A]/80" />{route.verification}</p>
+                        <p className="mt-2 flex items-center gap-2 text-sm font-medium"><span className={`h-1.5 w-1.5 rounded-full ${route.verification === 'No superada' ? 'bg-[#D6A24A]' : 'bg-[#D6A24A]/80'}`} />{route.verification}</p>
+                        {route.mode === 'manual' && route.verification === 'No superada' && (
+                          <p className="mt-3 rounded-lg border border-[#D6A24A]/[0.12] bg-[#D6A24A]/[0.035] px-3 py-2 text-xs leading-5 text-[#D6A24A]/75">
+                            OptiRoute Auto podría escalar esta solicitud.
+                          </p>
+                        )}
                       </div>
                     )}
                   </section>
@@ -1249,9 +1499,18 @@ function App() {
             )}
           </aside>
 
-          <p className="mt-2 w-full shrink-0 text-[9px] leading-3.5 text-white/20">
-            Estimaciones de demostración basadas en el escenario del prototipo.
-          </p>
+          <div className="impact-column">
+            <ImpactPanel
+              route={route}
+              routeStage={routeStage}
+              sessionStats={sessionStats}
+              budget={budget}
+            />
+
+            <p className="right-column__note w-full shrink-0 text-[9px] leading-3.5 text-white/20">
+              Estimaciones de demostración basadas en el escenario del prototipo.
+            </p>
+          </div>
         </div>
       </main>
       </div>

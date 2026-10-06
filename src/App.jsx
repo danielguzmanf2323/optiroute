@@ -16,6 +16,16 @@ const quickPrompts = [
   { label: 'Diseña una arquitectura', prompt: 'Diseña una arquitectura de software escalable, identifica sus componentes, dependencias y riesgos.' },
 ]
 
+const textCapabilities = Object.freeze({ text: true, vision: false, documents: false })
+const multimodalCapabilities = Object.freeze({ text: true, vision: true, documents: true })
+
+const ATTACHMENT_STORAGE_KEY = 'optiroute-agent-workspaces-v1'
+const MAX_ATTACHMENTS = 5
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024
+const ACCEPTED_ATTACHMENT_TYPES = 'image/png,image/jpeg,image/webp,application/pdf,text/plain,text/markdown,text/csv,.docx,.xlsx'
+const acceptedAttachmentExtensions = new Set(['png', 'jpg', 'jpeg', 'webp', 'pdf', 'txt', 'md', 'csv', 'docx', 'xlsx'])
+const acceptedAttachmentMimeTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'application/pdf', 'text/plain', 'text/markdown', 'text/csv'])
+
 const providerCatalog = {
   openai: {
     name: 'OpenAI',
@@ -24,9 +34,9 @@ const providerCatalog = {
       costs: { low: 0.0032, medium: 0.012, high: 0.03 },
     },
     models: [
-      { id: 'gpt-5-6-luna', provider: 'openai', name: 'GPT 5.6 Luna', tier: 'efficient', complexity: 'low', estimatedCost: 0.0002 },
-      { id: 'gpt-5-6-sol', provider: 'openai', name: 'GPT 5.6 Sol', tier: 'balanced', complexity: 'medium', estimatedCost: 0.006 },
-      { id: 'gpt-5-6-sol-max-demo', provider: 'openai', name: 'GPT 5.6 Sol Max (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.016 },
+      { id: 'gpt-5-6-luna', provider: 'openai', name: 'GPT 5.6 Luna', tier: 'efficient', complexity: 'low', estimatedCost: 0.0002, capabilities: textCapabilities },
+      { id: 'gpt-5-6-sol', provider: 'openai', name: 'GPT 5.6 Sol', tier: 'balanced', complexity: 'medium', estimatedCost: 0.006, capabilities: multimodalCapabilities },
+      { id: 'gpt-5-6-sol-max-demo', provider: 'openai', name: 'GPT 5.6 Sol Max (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.016, capabilities: multimodalCapabilities },
     ],
   },
   google: {
@@ -36,9 +46,9 @@ const providerCatalog = {
       costs: { low: 0.004, medium: 0.014, high: 0.032 },
     },
     models: [
-      { id: 'gemini-flash-lite-demo', provider: 'google', name: 'Gemini Flash Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0004 },
-      { id: 'gemini-2-5-flash-demo', provider: 'google', name: 'Gemini 2.5 Flash (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.004 },
-      { id: 'gemini-2-5-pro', provider: 'google', name: 'Gemini 2.5 Pro', tier: 'premium', complexity: 'high', estimatedCost: 0.012 },
+      { id: 'gemini-flash-lite-demo', provider: 'google', name: 'Gemini Flash Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0004, capabilities: textCapabilities },
+      { id: 'gemini-2-5-flash-demo', provider: 'google', name: 'Gemini 2.5 Flash (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.004, capabilities: multimodalCapabilities },
+      { id: 'gemini-2-5-pro', provider: 'google', name: 'Gemini 2.5 Pro', tier: 'premium', complexity: 'high', estimatedCost: 0.012, capabilities: multimodalCapabilities },
     ],
   },
   anthropic: {
@@ -48,9 +58,9 @@ const providerCatalog = {
       costs: { low: 0.0042, medium: 0.012, high: 0.031 },
     },
     models: [
-      { id: 'claude-haiku-eco-demo', provider: 'anthropic', name: 'Claude Haiku Eco (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0006 },
-      { id: 'claude-haiku-4-5', provider: 'anthropic', name: 'Claude Haiku 4.5', tier: 'balanced', complexity: 'medium', estimatedCost: 0.003 },
-      { id: 'claude-sonnet-route-demo', provider: 'anthropic', name: 'Claude Sonnet Route (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.014 },
+      { id: 'claude-haiku-eco-demo', provider: 'anthropic', name: 'Claude Haiku Eco (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0006, capabilities: textCapabilities },
+      { id: 'claude-haiku-4-5', provider: 'anthropic', name: 'Claude Haiku 4.5', tier: 'balanced', complexity: 'medium', estimatedCost: 0.003, capabilities: multimodalCapabilities },
+      { id: 'claude-sonnet-route-demo', provider: 'anthropic', name: 'Claude Sonnet Route (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.014, capabilities: multimodalCapabilities },
     ],
   },
   meta: {
@@ -60,9 +70,9 @@ const providerCatalog = {
       costs: { low: 0.0018, medium: 0.006, high: 0.018 },
     },
     models: [
-      { id: 'meta-route-lite-demo', provider: 'meta', name: 'Meta Route Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0001 },
-      { id: 'meta-route-core-demo', provider: 'meta', name: 'Meta Route Core (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.0018 },
-      { id: 'meta-route-pro-demo', provider: 'meta', name: 'Meta Route Pro (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.0065 },
+      { id: 'meta-route-lite-demo', provider: 'meta', name: 'Meta Route Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0001, capabilities: textCapabilities },
+      { id: 'meta-route-core-demo', provider: 'meta', name: 'Meta Route Core (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.0018, capabilities: multimodalCapabilities },
+      { id: 'meta-route-pro-demo', provider: 'meta', name: 'Meta Route Pro (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.0065, capabilities: multimodalCapabilities },
     ],
   },
   deepseek: {
@@ -72,9 +82,9 @@ const providerCatalog = {
       costs: { low: 0.0015, medium: 0.005, high: 0.016 },
     },
     models: [
-      { id: 'deepseek-route-lite-demo', provider: 'deepseek', name: 'DeepSeek Route Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0001 },
-      { id: 'deepseek-route-core-demo', provider: 'deepseek', name: 'DeepSeek Route Core (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.0015 },
-      { id: 'deepseek-route-pro-demo', provider: 'deepseek', name: 'DeepSeek Route Pro (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.0055 },
+      { id: 'deepseek-route-lite-demo', provider: 'deepseek', name: 'DeepSeek Route Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0001, capabilities: textCapabilities },
+      { id: 'deepseek-route-core-demo', provider: 'deepseek', name: 'DeepSeek Route Core (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.0015, capabilities: multimodalCapabilities },
+      { id: 'deepseek-route-pro-demo', provider: 'deepseek', name: 'DeepSeek Route Pro (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.0055, capabilities: multimodalCapabilities },
     ],
   },
   kimi: {
@@ -84,9 +94,9 @@ const providerCatalog = {
       costs: { low: 0.002, medium: 0.007, high: 0.02 },
     },
     models: [
-      { id: 'kimi-route-lite-demo', provider: 'kimi', name: 'Kimi Route Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0002 },
-      { id: 'kimi-route-core-demo', provider: 'kimi', name: 'Kimi Route Core (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.0022 },
-      { id: 'kimi-route-pro-demo', provider: 'kimi', name: 'Kimi Route Pro (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.0075 },
+      { id: 'kimi-route-lite-demo', provider: 'kimi', name: 'Kimi Route Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0002, capabilities: textCapabilities },
+      { id: 'kimi-route-core-demo', provider: 'kimi', name: 'Kimi Route Core (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.0022, capabilities: multimodalCapabilities },
+      { id: 'kimi-route-pro-demo', provider: 'kimi', name: 'Kimi Route Pro (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.0075, capabilities: multimodalCapabilities },
     ],
   },
 }
@@ -121,6 +131,38 @@ function getAvailableModels(activeAgent) {
   return providerCatalog[activeAgent]?.models || []
 }
 
+function getAttachmentRequirements(attachments = []) {
+  return {
+    vision: attachments.some((attachment) => attachment.category === 'image'),
+    documents: attachments.some((attachment) => attachment.category !== 'image'),
+  }
+}
+
+function isModelCompatible(model, attachments = []) {
+  const requirements = getAttachmentRequirements(attachments)
+  return (!requirements.vision || model.capabilities.vision) &&
+    (!requirements.documents || model.capabilities.documents)
+}
+
+function getModelIncompatibility(model, attachments = []) {
+  const requirements = getAttachmentRequirements(attachments)
+  const missingVision = requirements.vision && !model.capabilities.vision
+  const missingDocuments = requirements.documents && !model.capabilities.documents
+
+  if (missingVision && missingDocuments) return 'No compatible con imágenes ni documentos'
+  if (missingVision) return 'No compatible con imágenes'
+  if (missingDocuments) return 'No compatible con documentos'
+  return ''
+}
+
+function getAttachmentInputLabel(attachments = []) {
+  const requirements = getAttachmentRequirements(attachments)
+  if (requirements.vision && requirements.documents) return 'Multimodal'
+  if (requirements.vision) return 'Texto + imagen'
+  if (requirements.documents) return 'Texto + documento'
+  return 'Texto'
+}
+
 function getModelById(modelId) {
   return Object.values(providerCatalog)
     .flatMap((provider) => provider.models)
@@ -143,8 +185,13 @@ function formatSaving(estimatedCost, baselineCost, escalated = false) {
   return escalated ? `${percentage.toFixed(1)}%` : `${Math.round(percentage)}%`
 }
 
-function estimateTokensForDemo(prompt, complexity, tier) {
-  const promptTokens = Math.max(80, Math.ceil(prompt.length / 4))
+function estimateTokensForDemo(prompt, complexity, tier, attachments = []) {
+  const attachmentTokens = attachments.reduce((total, attachment) => {
+    if (attachment.category === 'image') return total + 1200
+    const sizeEstimate = Math.ceil(attachment.size / 1024) * 2
+    return total + Math.min(Math.max(sizeEstimate, 400), 6000)
+  }, 0)
+  const promptTokens = Math.max(80, Math.ceil(prompt.length / 4)) + attachmentTokens
   const complexityMultiplier = { low: 4, medium: 9, high: 18 }[complexity] || 4
   const tierRatio = { efficient: 0.58, balanced: 0.72, premium: 0.86 }[tier] || 0.72
   const premium = Math.max(500, Math.round((promptTokens * complexityMultiplier + 700) / 100) * 100)
@@ -171,6 +218,8 @@ function createRoute(model, classification, activeAgent, options = {}) {
   const restricted = activeAgent !== 'global'
   const escalated = options.escalated === true
   const mode = options.mode || 'auto'
+  const attachments = options.attachments || []
+  const inputType = getAttachmentInputLabel(attachments)
 
   let reason
 
@@ -181,9 +230,15 @@ function createRoute(model, classification, activeAgent, options = {}) {
       ? `La verificación inicial no fue superada. OptiRoute escaló dentro de ${provider.name} sin salir del proveedor permitido.`
       : `La verificación inicial no fue superada. OptiRoute escaló de ${options.initialProviderName} a ${provider.name} para aumentar la capacidad de la ruta.`
   } else {
-    reason = restricted
-      ? `El contexto está restringido a ${provider.name}. OptiRoute seleccionó la opción más eficiente disponible para esta complejidad.`
-      : `OptiRoute seleccionó ${provider.name} y ${model.name} por ofrecer capacidad suficiente para la tarea con un costo inferior a la referencia premium.`
+    if (attachments.length > 0) {
+      reason = restricted
+        ? `El contexto está restringido a ${provider.name}. OptiRoute seleccionó una opción compatible con la entrada adjunta y eficiente para esta complejidad.`
+        : `OptiRoute seleccionó ${provider.name} y ${model.name} por ser compatible con la entrada adjunta y ofrecer capacidad suficiente con menor costo estimado.`
+    } else {
+      reason = restricted
+        ? `El contexto está restringido a ${provider.name}. OptiRoute seleccionó la opción más eficiente disponible para esta complejidad.`
+        : `OptiRoute seleccionó ${provider.name} y ${model.name} por ofrecer capacidad suficiente para la tarea con un costo inferior a la referencia premium.`
+    }
   }
 
   return {
@@ -191,8 +246,11 @@ function createRoute(model, classification, activeAgent, options = {}) {
     providerName: provider.name,
     contextAgent: activeAgent,
     mode,
+    inputType,
+    inputAttachments: attachments.map(serializeAttachment),
     model: model.name,
     modelId: model.id,
+    modelComplexity: model.complexity,
     tier: model.tier,
     complexity: complexityLabels[classification.complexity],
     complexityId: classification.complexity,
@@ -212,36 +270,50 @@ function createRoute(model, classification, activeAgent, options = {}) {
   }
 }
 
-function selectManualRoute(classification, activeAgent, modelId) {
+function selectManualRoute(classification, activeAgent, modelId, attachments = []) {
   const allowedModel = getAvailableModels(activeAgent).find((model) => model.id === modelId)
-  return allowedModel
-    ? createRoute(allowedModel, classification, activeAgent, { mode: 'manual' })
-    : selectRoute(classification, activeAgent)
+  return allowedModel && isModelCompatible(allowedModel, attachments)
+    ? createRoute(allowedModel, classification, activeAgent, { mode: 'manual', attachments })
+    : null
 }
 
-function selectRoute(classification, activeAgent) {
-  const availableModels = getAvailableModels(activeAgent)
-  const preferredModel = activeAgent === 'global'
+function selectRoute(classification, activeAgent, attachments = []) {
+  const availableModels = getAvailableModels(activeAgent).filter((model) => isModelCompatible(model, attachments))
+  const exactModels = availableModels
+    .filter((model) => model.complexity === classification.complexity)
+    .sort((first, second) => first.estimatedCost - second.estimatedCost)
+  const higherModels = availableModels
+    .filter((model) => complexityOrder.indexOf(model.complexity) > complexityOrder.indexOf(classification.complexity))
+    .sort((first, second) => (
+      complexityOrder.indexOf(first.complexity) - complexityOrder.indexOf(second.complexity) ||
+      first.estimatedCost - second.estimatedCost
+    ))
+  const preferredModel = activeAgent === 'global' && attachments.length === 0
     ? getModelById(globalRoutePreferences[classification.complexity])
-    : availableModels
-      .filter((model) => model.complexity === classification.complexity)
-      .sort((first, second) => first.estimatedCost - second.estimatedCost)[0]
+    : exactModels[0] || higherModels[0] || availableModels[availableModels.length - 1]
 
-  return createRoute(preferredModel, classification, activeAgent)
+  return createRoute(preferredModel, classification, activeAgent, { attachments })
 }
 
-function escalateRoute(classification, activeAgent, initialRoute) {
+function escalateRoute(classification, activeAgent, initialRoute, attachments = []) {
+  const currentComplexity = complexityOrder[
+    Math.max(
+      complexityOrder.indexOf(classification.complexity),
+      complexityOrder.indexOf(initialRoute.modelComplexity || classification.complexity),
+    )
+  ]
   const nextComplexityIndex = Math.min(
-    complexityOrder.indexOf(classification.complexity) + 1,
+    complexityOrder.indexOf(currentComplexity) + 1,
     complexityOrder.length - 1,
   )
   const nextComplexity = complexityOrder[nextComplexityIndex]
-  const availableModels = getAvailableModels(activeAgent)
-  const escalatedModel = activeAgent === 'global'
+  const availableModels = getAvailableModels(activeAgent).filter((model) => isModelCompatible(model, attachments))
+  const escalatedModel = activeAgent === 'global' && attachments.length === 0
     ? getModelById(globalRoutePreferences[nextComplexity])
     : availableModels
       .filter((model) => model.complexity === nextComplexity)
-      .sort((first, second) => first.estimatedCost - second.estimatedCost)[0]
+      .sort((first, second) => first.estimatedCost - second.estimatedCost)[0] ||
+      availableModels[availableModels.length - 1]
   const combinedCost = parseCost(initialRoute.estimatedCost) + escalatedModel.estimatedCost
 
   return createRoute(
@@ -256,6 +328,7 @@ function escalateRoute(classification, activeAgent, initialRoute) {
       initialProvider: initialRoute.provider,
       initialProviderName: initialRoute.providerName,
       initialCost: initialRoute.estimatedCost,
+      attachments,
     },
   )
 }
@@ -530,7 +603,21 @@ function classifyTask(userMessage) {
   return { type: 'general-request', complexity: 'low', intent: 'assistance' }
 }
 
-function getAssistantResponse(userMessage) {
+function getAssistantResponse(userMessage, attachments = []) {
+  const requirements = getAttachmentRequirements(attachments)
+
+  if (requirements.vision && requirements.documents) {
+    return 'OptiRoute detectó una entrada multimodal y seleccionó una ruta compatible con visión y documentos. El análisis real del contenido estará disponible al conectar el procesamiento backend.'
+  }
+
+  if (requirements.vision) {
+    return 'OptiRoute detectó una entrada visual y seleccionó una ruta compatible con visión. El análisis real del contenido estará disponible al conectar el procesamiento backend.'
+  }
+
+  if (requirements.documents) {
+    return 'OptiRoute detectó un documento adjunto y seleccionó una ruta compatible. El análisis real del contenido estará disponible al conectar el procesamiento backend.'
+  }
+
   const normalizedMessage = userMessage
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -585,6 +672,8 @@ function createEmptySession(agentId, sessionId = createSessionId(agentId)) {
     createdAt: now,
     updatedAt: now,
     draft: '',
+    draftAttachments: [],
+    attachmentError: '',
     modelPreference: 'auto',
     messages: [],
     route: null,
@@ -611,6 +700,132 @@ function createAgentWorkspace(agentId) {
 
 function createAgentWorkspaces() {
   return Object.fromEntries(agents.map((agent) => [agent.id, createAgentWorkspace(agent.id)]))
+}
+
+function getAttachmentCategory(file) {
+  const extension = file.name.split('.').pop()?.toLowerCase() || ''
+  if (file.type.startsWith('image/') || ['png', 'jpg', 'jpeg', 'webp'].includes(extension)) return 'image'
+  if (['xlsx'].includes(extension)) return 'spreadsheet'
+  if (['txt', 'md', 'csv'].includes(extension)) return 'text'
+  return 'document'
+}
+
+function isAcceptedAttachment(file) {
+  const extension = file.name.split('.').pop()?.toLowerCase() || ''
+  return acceptedAttachmentExtensions.has(extension) || acceptedAttachmentMimeTypes.has(file.type)
+}
+
+function createAttachment(file) {
+  const category = getAttachmentCategory(file)
+  return {
+    id: `attachment-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    name: file.name,
+    type: file.type || 'application/octet-stream',
+    size: file.size,
+    category,
+    previewUrl: category === 'image' ? URL.createObjectURL(file) : null,
+    available: true,
+  }
+}
+
+function formatFileSize(size) {
+  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`
+  if (size >= 1024) return `${Math.round(size / 1024)} KB`
+  return `${size} B`
+}
+
+function serializeAttachment(attachment) {
+  return {
+    id: attachment.id,
+    name: attachment.name,
+    type: attachment.type,
+    size: attachment.size,
+    category: attachment.category,
+  }
+}
+
+function restoreAttachment(attachment) {
+  return {
+    ...attachment,
+    previewUrl: null,
+    available: false,
+  }
+}
+
+function serializeAgentWorkspaces(workspaces) {
+  return Object.fromEntries(Object.entries(workspaces).map(([agentId, workspace]) => [
+    agentId,
+    {
+      ...workspace,
+      sessions: Object.fromEntries(Object.entries(workspace.sessions).map(([sessionId, session]) => [
+        sessionId,
+        {
+          ...session,
+          processing: false,
+          budgetEditing: false,
+          attachmentError: '',
+          draftAttachments: session.draftAttachments.map(serializeAttachment),
+          messages: session.messages.map((message) => ({
+            ...message,
+            attachments: (message.attachments || []).map(serializeAttachment),
+          })),
+          history: session.history.map((entry) => ({
+            ...entry,
+            attachments: (entry.attachments || []).map(serializeAttachment),
+          })),
+        },
+      ])),
+    },
+  ]))
+}
+
+function loadAgentWorkspaces() {
+  const fallback = createAgentWorkspaces()
+
+  try {
+    const stored = window.localStorage.getItem(ATTACHMENT_STORAGE_KEY)
+    if (!stored) return fallback
+
+    const parsed = JSON.parse(stored)
+
+    return Object.fromEntries(agents.map((agent) => {
+      const storedWorkspace = parsed[agent.id]
+      if (!storedWorkspace?.sessions || Object.keys(storedWorkspace.sessions).length === 0) {
+        return [agent.id, fallback[agent.id]]
+      }
+
+      const sessions = Object.fromEntries(Object.entries(storedWorkspace.sessions).map(([sessionId, storedSession]) => {
+        const baseSession = createEmptySession(agent.id, sessionId)
+        const routeStage = storedSession.route && storedSession.routeStage === 'verified' ? 'verified' : 'idle'
+
+        return [sessionId, {
+          ...baseSession,
+          ...storedSession,
+          id: sessionId,
+          processing: false,
+          routeStage,
+          budgetEditing: false,
+          attachmentError: '',
+          draftAttachments: (storedSession.draftAttachments || []).map(restoreAttachment),
+          messages: (storedSession.messages || []).map((message) => ({
+            ...message,
+            attachments: (message.attachments || []).map(restoreAttachment),
+          })),
+          history: (storedSession.history || []).map((entry) => ({
+            ...entry,
+            attachments: (entry.attachments || []).map(restoreAttachment),
+          })),
+        }]
+      }))
+      const activeSessionId = sessions[storedWorkspace.activeSessionId]
+        ? storedWorkspace.activeSessionId
+        : Object.keys(sessions)[0]
+
+      return [agent.id, { activeSessionId, sessions }]
+    }))
+  } catch {
+    return fallback
+  }
 }
 
 function generateSessionTitle(prompt) {
@@ -780,7 +995,48 @@ function SessionSwitcher({
   )
 }
 
-function ModelPicker({ activeAgent, value, open, onToggle, onChange, disabled }) {
+function AttachmentPreview({ attachment, removable = false, disabled = false, onRemove, compact = false }) {
+  const hasImagePreview = attachment.category === 'image' && attachment.previewUrl && attachment.available !== false
+
+  return (
+    <div className={`attachment-preview ${compact ? 'attachment-preview--compact' : ''} ${hasImagePreview ? 'attachment-preview--image' : 'attachment-preview--file'}`}>
+      {hasImagePreview ? (
+        <img src={attachment.previewUrl} alt={`Vista previa de ${attachment.name}`} />
+      ) : (
+        <span className="attachment-preview__icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20">
+            <path d="M5.5 2.75h5.8l3.2 3.2v11.3h-9z" fill="none" stroke="currentColor" strokeLinejoin="round" />
+            <path d="M11.3 2.75v3.2h3.2M7.6 10h4.8M7.6 12.8h4.8" fill="none" stroke="currentColor" strokeLinecap="round" />
+          </svg>
+        </span>
+      )}
+
+      {(!hasImagePreview || !compact) && (
+        <span className="attachment-preview__meta">
+          <span className="attachment-preview__name">{attachment.name}</span>
+          <span className="attachment-preview__size">{formatFileSize(attachment.size)}</span>
+          {attachment.available === false && (
+            <span className="attachment-preview__unavailable">Archivo local no disponible tras recargar</span>
+          )}
+        </span>
+      )}
+
+      {removable && (
+        <button
+          type="button"
+          disabled={disabled}
+          aria-label={`Eliminar ${attachment.name}`}
+          onClick={() => onRemove(attachment.id)}
+          className="attachment-preview__remove"
+        >
+          ×
+        </button>
+      )}
+    </div>
+  )
+}
+
+function ModelPicker({ activeAgent, value, open, onToggle, onChange, disabled, attachments }) {
   const selectedModel = value === 'auto' ? null : getModelById(value)
   const providers = activeAgent === 'global'
     ? Object.entries(providerCatalog)
@@ -836,21 +1092,29 @@ function ModelPicker({ activeAgent, value, open, onToggle, onChange, disabled })
             <div key={providerId} className="mt-3 border-t border-white/[0.06] pt-3">
               <p className="px-3 text-[8px] uppercase tracking-[0.18em] text-white/25">{provider.name}</p>
               <div className="mt-1 space-y-0.5">
-                {provider.models.map((model) => (
-                  <button
-                    key={model.id}
-                    type="button"
-                    role="option"
-                    aria-selected={value === model.id}
-                    onClick={() => onChange(model.id)}
-                    className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-150 ${
-                      value === model.id ? 'bg-white/[0.06] text-[#F3F2EE]' : 'text-[#A1A6AE] hover:bg-white/[0.035] hover:text-[#E5E6E3]'
-                    }`}
-                  >
-                    <span className="truncate text-[11px]">{model.name}</span>
-                    <span className="shrink-0 text-[8px] uppercase tracking-[0.12em] text-white/25">{complexityLabels[model.complexity]}</span>
-                  </button>
-                ))}
+                {provider.models.map((model) => {
+                  const incompatibility = getModelIncompatibility(model, attachments)
+
+                  return (
+                    <button
+                      key={model.id}
+                      type="button"
+                      role="option"
+                      aria-selected={value === model.id}
+                      disabled={disabled || Boolean(incompatibility)}
+                      onClick={() => onChange(model.id)}
+                      className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 ${
+                        value === model.id ? 'bg-white/[0.06] text-[#F3F2EE]' : 'text-[#A1A6AE] hover:bg-white/[0.035] hover:text-[#E5E6E3]'
+                      }`}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-[11px]">{model.name}</span>
+                        {incompatibility && <span className="mt-0.5 block text-[8px] text-[#D6A24A]/55">{incompatibility}</span>}
+                      </span>
+                      <span className="shrink-0 text-[8px] uppercase tracking-[0.12em] text-white/25">{complexityLabels[model.complexity]}</span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           ))}
@@ -927,18 +1191,23 @@ function ImpactPanel({ route, routeStage, sessionStats, budget }) {
 
 function App() {
   const [activeAgent, setActiveAgent] = useState('global')
-  const [agentWorkspaces, setAgentWorkspaces] = useState(createAgentWorkspaces)
+  const [agentWorkspaces, setAgentWorkspaces] = useState(loadAgentWorkspaces)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [modelMenuOpen, setModelMenuOpen] = useState(false)
   const [sessionMenuOpen, setSessionMenuOpen] = useState(false)
+  const [isDraggingAttachments, setIsDraggingAttachments] = useState(false)
   const sessionGenerations = useRef({})
   const messagesContainerRef = useRef(null)
+  const fileInputRef = useRef(null)
+  const objectUrlsRef = useRef(new Set())
   const activeAgentWorkspace = agentWorkspaces[activeAgent]
   const activeSessionId = activeAgentWorkspace.activeSessionId
   const activeSession = activeAgentWorkspace.sessions[activeSessionId]
   const agentSessions = Object.values(activeAgentWorkspace.sessions)
   const {
     draft: message,
+    draftAttachments,
+    attachmentError,
     modelPreference,
     messages,
     route,
@@ -976,6 +1245,8 @@ function App() {
   }
 
   const setMessage = (value) => setActiveSessionField('draft', value)
+  const setDraftAttachments = (value) => setActiveSessionField('draftAttachments', value)
+  const setAttachmentError = (value) => setActiveSessionField('attachmentError', value)
   const setModelPreference = (value) => setActiveSessionField('modelPreference', value)
   const setMessages = (value) => setActiveSessionField('messages', value)
   const setRoute = (value) => setActiveSessionField('route', value)
@@ -987,11 +1258,19 @@ function App() {
   const setBudgetEditing = (value) => setActiveSessionField('budgetEditing', value)
   const setBudgetDraft = (value) => setActiveSessionField('budgetDraft', value)
   const selectedAgent = agents.find((agent) => agent.id === activeAgent) || agents[0]
+  const selectedPreferenceModel = modelPreference === 'auto' ? null : getModelById(modelPreference)
+  const selectedModelIncompatibility = selectedPreferenceModel
+    ? getModelIncompatibility(selectedPreferenceModel, draftAttachments)
+    : ''
+  const visibleAttachmentError = attachmentError || (selectedModelIncompatibility
+    ? 'El modelo seleccionado no admite este tipo de archivo. Selecciona otro modelo o vuelve a OptiRoute Auto.'
+    : '')
   const escalationPreview = route && routeStage === 'escalating'
     ? escalateRoute(
       { type: route.taskType, complexity: route.complexityId, intent: route.intent },
       route.contextAgent,
       route,
+      route.inputAttachments || [],
     )
     : null
 
@@ -1001,6 +1280,22 @@ function App() {
   const safeUsagePercentage = Math.min(usagePercentage, 100)
   const isNearBudget = usagePercentage >= 80 && usagePercentage < 100
   const isOverBudget = usagePercentage >= 100
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        ATTACHMENT_STORAGE_KEY,
+        JSON.stringify(serializeAgentWorkspaces(agentWorkspaces)),
+      )
+    } catch {
+      // La demo continúa en memoria si el almacenamiento no está disponible.
+    }
+  }, [agentWorkspaces])
+
+  useEffect(() => () => {
+    objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
+    objectUrlsRef.current.clear()
+  }, [])
 
   useEffect(() => {
     const container = messagesContainerRef.current
@@ -1023,6 +1318,75 @@ function App() {
   const cancelBudgetEditing = () => {
     setBudgetDraft(budget.toFixed(4))
     setBudgetEditing(false)
+  }
+
+  const getManualCompatibilityError = (attachments) => {
+    if (modelPreference === 'auto') return ''
+    const selectedModel = getModelById(modelPreference)
+    return selectedModel ? getModelIncompatibility(selectedModel, attachments) : ''
+  }
+
+  const releaseAttachmentUrl = (attachment) => {
+    if (!attachment.previewUrl || !objectUrlsRef.current.has(attachment.previewUrl)) return
+    URL.revokeObjectURL(attachment.previewUrl)
+    objectUrlsRef.current.delete(attachment.previewUrl)
+  }
+
+  const releaseSessionUrls = (session) => {
+    session.draftAttachments.forEach(releaseAttachmentUrl)
+    session.messages.forEach((item) => (item.attachments || []).forEach(releaseAttachmentUrl))
+  }
+
+  const addAttachments = (files) => {
+    if (processing) return
+
+    const incomingFiles = Array.from(files || [])
+    if (incomingFiles.length === 0) return
+
+    const availableSlots = Math.max(MAX_ATTACHMENTS - draftAttachments.length, 0)
+    const acceptedFiles = []
+    let nextError = incomingFiles.length > availableSlots
+      ? `Puedes adjuntar un máximo de ${MAX_ATTACHMENTS} archivos por mensaje.`
+      : ''
+
+    incomingFiles.forEach((file) => {
+      if (acceptedFiles.length >= availableSlots) return
+      if (!isAcceptedAttachment(file)) {
+        nextError = `${file.name} no es un tipo de archivo compatible.`
+        return
+      }
+      if (file.size > MAX_ATTACHMENT_SIZE) {
+        nextError = `${file.name} supera el límite de 10 MB.`
+        return
+      }
+      acceptedFiles.push(file)
+    })
+
+    const newAttachments = acceptedFiles.map(createAttachment)
+    newAttachments.forEach((attachment) => {
+      if (attachment.previewUrl) objectUrlsRef.current.add(attachment.previewUrl)
+    })
+    const nextAttachments = [...draftAttachments, ...newAttachments]
+    const compatibilityError = getManualCompatibilityError(nextAttachments)
+
+    setDraftAttachments(nextAttachments)
+    setAttachmentError(compatibilityError
+      ? 'El modelo seleccionado no admite este tipo de archivo. Selecciona otro modelo o vuelve a OptiRoute Auto.'
+      : nextError)
+  }
+
+  const removeAttachment = (attachmentId) => {
+    if (processing) return
+
+    const attachment = draftAttachments.find((item) => item.id === attachmentId)
+    if (attachment) releaseAttachmentUrl(attachment)
+
+    const nextAttachments = draftAttachments.filter((item) => item.id !== attachmentId)
+    const compatibilityError = getManualCompatibilityError(nextAttachments)
+    setDraftAttachments(nextAttachments)
+    setAttachmentError(compatibilityError
+      ? 'El modelo seleccionado no admite este tipo de archivo. Selecciona otro modelo o vuelve a OptiRoute Auto.'
+      : '')
   }
 
   const handleCreateSession = () => {
@@ -1073,6 +1437,7 @@ function App() {
 
     if (!confirmed) return
 
+    releaseSessionUrls(sessionToDelete)
     sessionGenerations.current[sessionId] = (sessionGenerations.current[sessionId] || 0) + 1
     setAgentWorkspaces((currentWorkspaces) => {
       const workspace = currentWorkspaces[activeAgent]
@@ -1109,9 +1474,16 @@ function App() {
   }
 
   const sendMessage = async () => {
-    if (!message.trim() || processing) return
+    if ((!message.trim() && draftAttachments.length === 0) || processing) return
+
+    const manualCompatibilityError = getManualCompatibilityError(draftAttachments)
+    if (manualCompatibilityError) {
+      setAttachmentError('El modelo seleccionado no admite este tipo de archivo. Selecciona otro modelo o vuelve a OptiRoute Auto.')
+      return
+    }
 
     const userMessage = message.trim()
+    const requestAttachments = draftAttachments.map((attachment) => ({ ...attachment }))
     const requestAgent = activeAgent
     const requestSessionId = activeSessionId
     const requestModelPreference = modelPreference
@@ -1125,10 +1497,16 @@ function App() {
       {
         role: 'user',
         content: userMessage,
+        attachments: requestAttachments,
       },
     ])
     setMessage('')
-    if (isFirstMessage) setActiveSessionField('title', generateSessionTitle(userMessage))
+    setDraftAttachments([])
+    setAttachmentError('')
+    setIsDraggingAttachments(false)
+    if (isFirstMessage) {
+      setActiveSessionField('title', generateSessionTitle(userMessage || requestAttachments[0].name))
+    }
     setActiveSessionField('updatedAt', Date.now())
     setProcessing(true)
     setRouteStage('analyzing')
@@ -1138,10 +1516,11 @@ function App() {
 
     if (activeGeneration !== (sessionGenerations.current[requestSessionId] || 0)) return
 
-    const classification = classifyTask(userMessage)
+    const classificationPrompt = userMessage || `Analiza ${requestAttachments.map((attachment) => attachment.name).join(', ')}`
+    const classification = classifyTask(classificationPrompt)
     const initialRoute = isAutoMode
-      ? selectRoute(classification, requestAgent)
-      : selectManualRoute(classification, requestAgent, requestModelPreference)
+      ? selectRoute(classification, requestAgent, requestAttachments)
+      : selectManualRoute(classification, requestAgent, requestModelPreference, requestAttachments)
     setRoute(initialRoute)
     setRouteStage('selected')
 
@@ -1164,7 +1543,7 @@ function App() {
         if (activeGeneration !== (sessionGenerations.current[requestSessionId] || 0)) return
       }
 
-      selectedRoute = escalateRoute(classification, requestAgent, initialRoute)
+      selectedRoute = escalateRoute(classification, requestAgent, initialRoute, requestAttachments)
       setRoute(selectedRoute)
       setRouteStage('verifying')
 
@@ -1191,12 +1570,13 @@ function App() {
         userMessage,
         selectedRoute.complexityId,
         selectedRoute.tier,
+        requestAttachments,
       ),
     }
 
     const estimatedCost = parseCost(selectedRoute.estimatedCost)
     const baselineCost = parseCost(selectedRoute.baselineCost)
-    const assistantResponse = getAssistantResponse(userMessage)
+    const assistantResponse = getAssistantResponse(userMessage, requestAttachments)
     const now = new Date()
     const createdAt = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 
@@ -1222,6 +1602,7 @@ function App() {
         id: Date.now(),
         prompt: userMessage,
         response: assistantResponse,
+        attachments: requestAttachments,
         model: selectedRoute.model,
         provider: selectedRoute.provider,
         providerName: selectedRoute.providerName,
@@ -1269,6 +1650,7 @@ function App() {
 
     if (!confirmed) return
 
+    releaseSessionUrls(activeSession)
     sessionGenerations.current[activeSessionId] = (sessionGenerations.current[activeSessionId] || 0) + 1
     updateSession(activeAgent, activeSessionId, (currentSession) => ({
       ...createEmptySession(activeAgent, activeSessionId),
@@ -1327,7 +1709,7 @@ function App() {
         />
 
       <main key={`${activeAgent}-${activeSessionId}`} className="workspace-main workspace-switch">
-        <section className="relative flex h-[calc(100vh-8rem)] min-h-[600px] min-w-0 flex-col md:h-full md:min-h-0 md:overflow-hidden">
+        <section className="chat-column relative flex h-[calc(100vh-8rem)] min-h-[600px] min-w-0 flex-col md:h-full md:min-h-0 md:overflow-hidden">
           <div className="absolute -left-5 top-1 hidden h-28 flex-col items-center justify-between md:flex">
             <span className="absolute top-1 bottom-1 w-px bg-white/[0.06]" />
             <span className="relative h-2 w-2 rounded-full border border-[#D9A441]/60 bg-[#D9A441]" />
@@ -1381,19 +1763,32 @@ function App() {
 
           <div
             ref={messagesContainerRef}
-            className="mt-10 min-h-0 flex-1 overflow-y-auto pr-2"
+            className="chat-message-stream mt-10 min-h-0 flex-1 overflow-y-auto pr-2"
           >
-            <div className="max-w-3xl space-y-7 pb-8">
+            <div className="conversation-turns w-full pb-8">
               {messages.map((item, index) => (
                 item.role === 'user' ? (
-                  <div key={index} className="message-enter pl-1">
-                    <p className="mb-2 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.16em] text-[#6F757D]">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#6F757D]" />
-                      Tú
-                    </p>
-                    <p className="max-w-2xl whitespace-pre-wrap break-words text-[15px] leading-7 text-[#E4E5E7] [overflow-wrap:anywhere]">
-                      {item.content}
-                    </p>
+                  <div key={index} className="message-enter user-message-row">
+                    <div className="user-message-stack">
+                      <p className="user-message-label">
+                        <span className="user-message-label__dot" />
+                        Tú
+                      </p>
+                      <div className="user-message-bubble">
+                        {(item.attachments || []).length > 0 && (
+                          <div className="message-attachments">
+                            {item.attachments.map((attachment) => (
+                              <AttachmentPreview key={attachment.id} attachment={attachment} compact />
+                            ))}
+                          </div>
+                        )}
+                        {item.content && (
+                          <p className="user-message-content whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                            {item.content}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div key={index} className="message-enter flex items-stretch gap-3">
@@ -1443,7 +1838,31 @@ function App() {
             </div>
           </div>
 
-          <div className="composer-shell mt-4 shrink-0 rounded-[18px] border border-white/[0.08] bg-[#111418]/[0.92] p-3 transition-[border-color,box-shadow] duration-200 focus-within:border-[#7BC6FF]/[0.22]">
+          <div
+            className={`composer-shell relative mt-4 shrink-0 rounded-[18px] border bg-[#111418]/[0.92] p-3 transition-[border-color,box-shadow] duration-200 focus-within:border-[#7BC6FF]/[0.22] ${isDraggingAttachments ? 'composer-shell--dragging border-[#7BC6FF]/30' : 'border-white/[0.08]'}`}
+            onDragEnter={(event) => {
+              event.preventDefault()
+              if (!processing) setIsDraggingAttachments(true)
+            }}
+            onDragOver={(event) => {
+              event.preventDefault()
+              if (!processing) event.dataTransfer.dropEffect = 'copy'
+            }}
+            onDragLeave={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setIsDraggingAttachments(false)
+            }}
+            onDrop={(event) => {
+              event.preventDefault()
+              setIsDraggingAttachments(false)
+              if (!processing) addAttachments(event.dataTransfer.files)
+            }}
+          >
+            {isDraggingAttachments && !processing && (
+              <div className="attachment-drop-overlay" aria-hidden="true">
+                <span>Suelta tus archivos aquí</span>
+              </div>
+            )}
+
             <textarea
               rows="3"
               value={message}
@@ -1458,18 +1877,70 @@ function App() {
               className="h-[112px] w-full resize-none overflow-x-hidden bg-transparent p-3 text-[15px] text-[#F4F4F2] outline-none placeholder:text-[#626467]"
             />
 
+            {draftAttachments.length > 0 && (
+              <div className="draft-attachments" aria-label="Archivos preparados">
+                {draftAttachments.map((attachment) => (
+                  <AttachmentPreview
+                    key={attachment.id}
+                    attachment={attachment}
+                    removable
+                    disabled={processing}
+                    onRemove={removeAttachment}
+                  />
+                ))}
+              </div>
+            )}
+
+            {visibleAttachmentError && (
+              <p className="attachment-error" role="status">{visibleAttachmentError}</p>
+            )}
+
             <div className="flex items-end justify-between gap-3">
-              <ModelPicker
-                activeAgent={activeAgent}
-                value={modelPreference}
-                open={modelMenuOpen}
-                disabled={processing}
-                onToggle={() => setModelMenuOpen((current) => !current)}
-                onChange={(value) => {
-                  setModelPreference(value)
-                  setModelMenuOpen(false)
-                }}
-              />
+              <div className="flex min-w-0 items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept={ACCEPTED_ATTACHMENT_TYPES}
+                  aria-label="Seleccionar archivos para adjuntar"
+                  className="sr-only"
+                  onChange={(event) => {
+                    addAttachments(event.target.files)
+                    event.target.value = ''
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={processing}
+                  aria-label="Adjuntar archivo"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="attachment-button"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 20 20">
+                    <path d="M7.1 10.8 11.8 6a2.5 2.5 0 0 1 3.6 3.5l-6.1 6.2a4 4 0 0 1-5.7-5.7l6.2-6.2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+
+                <ModelPicker
+                  activeAgent={activeAgent}
+                  value={modelPreference}
+                  open={modelMenuOpen}
+                  disabled={processing}
+                  attachments={draftAttachments}
+                  onToggle={() => setModelMenuOpen((current) => !current)}
+                  onChange={(value) => {
+                    const selectedModel = value === 'auto' ? null : getModelById(value)
+                    const incompatibility = selectedModel
+                      ? getModelIncompatibility(selectedModel, draftAttachments)
+                      : ''
+                    setModelPreference(value)
+                    setAttachmentError(incompatibility
+                      ? 'El modelo seleccionado no admite este tipo de archivo. Selecciona otro modelo o vuelve a OptiRoute Auto.'
+                      : '')
+                    setModelMenuOpen(false)
+                  }}
+                />
+              </div>
 
               <button
                 type="button"
@@ -1544,6 +2015,13 @@ function App() {
                       : 'Selección manual'}
                   </span>
                 </div>
+                {route?.inputType && route.inputType !== 'Texto' && (
+                  <div className="mt-1.5 flex items-center gap-2 text-[9px] uppercase tracking-[0.14em]">
+                    <span className="text-white/25">Entrada</span>
+                    <span className="h-px w-3 bg-white/[0.08]" />
+                    <span className="normal-case tracking-normal text-white/45">{route.inputType}</span>
+                  </div>
+                )}
               </div>
 
               <OptiRouteMascot
@@ -2043,14 +2521,31 @@ function App() {
                         </div>
 
                         <p className="mt-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/45">
-                          {getHistoryLabel(entry.prompt)}
+                          {(entry.attachments || []).length > 0
+                            ? getAttachmentInputLabel(entry.attachments)
+                            : getHistoryLabel(entry.prompt)}
                         </p>
 
-                        <p className="history-entry-prompt mt-2 break-words text-[13px] leading-5 text-[#D3D5D8] transition-colors duration-150 [overflow-wrap:anywhere]">
-                          {entry.prompt.length > 160
-                            ? `${entry.prompt.slice(0, 160)}…`
-                            : entry.prompt}
-                        </p>
+                        {(entry.attachments || []).length > 0 && (
+                          <div className="history-attachments">
+                            {entry.attachments.map((attachment) => (
+                              <span key={attachment.id} className="history-attachment">
+                                <svg aria-hidden="true" viewBox="0 0 16 16">
+                                  <path d="M4.5 2.5h4.7l2.3 2.3v8.7h-7zM9.2 2.5v2.3h2.3" fill="none" stroke="currentColor" strokeLinejoin="round" />
+                                </svg>
+                                <span>{attachment.name}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {entry.prompt && (
+                          <p className="history-entry-prompt mt-2 break-words text-[13px] leading-5 text-[#D3D5D8] transition-colors duration-150 [overflow-wrap:anywhere]">
+                            {entry.prompt.length > 160
+                              ? `${entry.prompt.slice(0, 160)}…`
+                              : entry.prompt}
+                          </p>
+                        )}
 
                         {entry.escalated ? (
                           <div className="mt-5 border-l border-white/10 pl-4">

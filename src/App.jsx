@@ -456,13 +456,14 @@ function AgentHub({ activeAgent, onSelectAgent, onNewSession, selectionDisabled 
       <button
         type="button"
         onClick={onNewSession}
+        disabled={selectionDisabled}
         aria-label="Nueva sesión"
         className="agent-hub__new-session group"
       >
         <span aria-hidden="true">+</span>
         <span role="tooltip" className="agent-hub__tooltip agent-hub__tooltip--bottom">
           <span>Nueva sesión</span>
-          <span>Próximamente</span>
+          <span>En el agente activo</span>
         </span>
       </button>
     </aside>
@@ -568,9 +569,22 @@ const initialSessionStats = {
   savings: 0,
 }
 
-function createEmptyWorkspace() {
+let sessionSequence = 0
+
+function createSessionId(agentId) {
+  sessionSequence += 1
+  return `${agentId}-${Date.now().toString(36)}-${sessionSequence.toString(36)}`
+}
+
+function createEmptySession(agentId, sessionId = createSessionId(agentId)) {
+  const now = Date.now()
+
   return {
-    message: '',
+    id: sessionId,
+    title: 'Nueva conversación',
+    createdAt: now,
+    updatedAt: now,
+    draft: '',
     modelPreference: 'auto',
     messages: [],
     route: null,
@@ -584,8 +598,49 @@ function createEmptyWorkspace() {
   }
 }
 
+function createAgentWorkspace(agentId) {
+  const session = createEmptySession(agentId)
+
+  return {
+    activeSessionId: session.id,
+    sessions: {
+      [session.id]: session,
+    },
+  }
+}
+
 function createAgentWorkspaces() {
-  return Object.fromEntries(agents.map((agent) => [agent.id, createEmptyWorkspace()]))
+  return Object.fromEntries(agents.map((agent) => [agent.id, createAgentWorkspace(agent.id)]))
+}
+
+function generateSessionTitle(prompt) {
+  const original = prompt.replace(/\s+/g, ' ').trim()
+  let title = original
+  const leadingPhrases = /^(?:por favor\s+|necesito\s+|quiero\s+|puedes\s+|podr[ií]as\s+|ay[uú]dame\s+(?:a|con)\s+|analiza(?:r)?\s+|dise[ñn]a(?:r)?\s+|resume(?:n|ir)?\s+|explica(?:r)?\s+|este\s+|esta\s+|un\s+|una\s+)/i
+
+  while (leadingPhrases.test(title)) {
+    title = title.replace(leadingPhrases, '').trim()
+  }
+
+  title = (title || original).replace(/[.!?…,:;\s]+$/g, '')
+
+  if (title.length > 42) {
+    const shortened = title.slice(0, 42)
+    const lastSpace = shortened.lastIndexOf(' ')
+    title = `${shortened.slice(0, lastSpace > 26 ? lastSpace : 42).trim()}…`
+  }
+
+  return title.charAt(0).toUpperCase() + title.slice(1)
+}
+
+function formatSessionTimestamp(timestamp) {
+  const date = new Date(timestamp)
+  const today = new Date()
+  const sameDay = date.toDateString() === today.toDateString()
+
+  return new Intl.DateTimeFormat('es', sameDay
+    ? { hour: '2-digit', minute: '2-digit', hour12: false }
+    : { day: '2-digit', month: 'short' }).format(date)
 }
 
 function AgentIdentity({ agentId, size = 'sm', active = false, mood }) {
@@ -615,6 +670,114 @@ function AgentIdentity({ agentId, size = 'sm', active = false, mood }) {
 function getAgentChatLabel(agentId) {
   const agent = agents.find((item) => item.id === agentId) || agents[0]
   return agent.id === 'global' ? 'OptiRoute' : `${agent.name} Agent`
+}
+
+function SessionSwitcher({
+  agent,
+  sessions,
+  activeSessionId,
+  open,
+  disabled,
+  onToggle,
+  onSelect,
+  onCreate,
+  onDelete,
+}) {
+  const orderedSessions = [...sessions].sort((first, second) => second.updatedAt - first.updatedAt)
+
+  return (
+    <div className={`session-switcher active-agent-context--${agent.avatar.color} hidden md:block`}>
+      {open && (
+        <button
+          type="button"
+          aria-label="Cerrar selector de sesiones"
+          className="fixed inset-0 z-[-1] cursor-default"
+          onClick={onToggle}
+        />
+      )}
+
+      <button
+        type="button"
+        disabled={disabled}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={`Agente activo: ${agent.name}. Ver sesiones`}
+        onClick={onToggle}
+        className="active-agent-context"
+      >
+        <AgentAvatar
+          {...agent.avatar}
+          size="xs"
+          active
+          className="active-agent-context__avatar"
+        />
+        <span className="min-w-0 text-left">
+          <span className="active-agent-context__label block">Agente activo</span>
+          <span className="active-agent-context__name-row">
+            <span className="active-agent-context__accent" />
+            <span className="active-agent-context__name">{agent.name}</span>
+            <svg aria-hidden="true" viewBox="0 0 12 12" className={`session-switcher__chevron ${open ? 'rotate-180' : ''}`}>
+              <path d="m3 4.5 3 3 3-3" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+        </span>
+      </button>
+
+      {open && (
+        <div role="dialog" aria-label={`Sesiones de ${agent.name}`} className="session-switcher__popover">
+          <div className="session-switcher__header">
+            <div>
+              <p className="session-switcher__eyebrow">Sesiones</p>
+              <p className="session-switcher__agent">{agent.name}</p>
+            </div>
+            <span className="session-switcher__count">{sessions.length}</span>
+          </div>
+
+          <div className="session-switcher__list">
+            {orderedSessions.map((session) => {
+              const isActive = session.id === activeSessionId
+
+              return (
+                <div key={session.id} className={`session-switcher__item ${isActive ? 'session-switcher__item--active' : ''}`}>
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => onSelect(session.id)}
+                    className="session-switcher__select"
+                  >
+                    <span className="session-switcher__status" />
+                    <span className="min-w-0 flex-1">
+                      <span className="session-switcher__title">{session.title}</span>
+                      <span className="session-switcher__time">{formatSessionTimestamp(session.updatedAt)}</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    aria-label={`Eliminar sesión ${session.title}`}
+                    onClick={() => onDelete(session.id)}
+                    className="session-switcher__delete"
+                  >
+                    ×
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onCreate}
+            className="session-switcher__create"
+          >
+            <span aria-hidden="true">+</span>
+            Nueva conversación
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function ModelPicker({ activeAgent, value, open, onToggle, onChange, disabled }) {
@@ -767,13 +930,15 @@ function App() {
   const [agentWorkspaces, setAgentWorkspaces] = useState(createAgentWorkspaces)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [modelMenuOpen, setModelMenuOpen] = useState(false)
-  const sessionGenerations = useRef(
-    Object.fromEntries(agents.map((agent) => [agent.id, 0])),
-  )
+  const [sessionMenuOpen, setSessionMenuOpen] = useState(false)
+  const sessionGenerations = useRef({})
   const messagesContainerRef = useRef(null)
-  const activeWorkspace = agentWorkspaces[activeAgent]
+  const activeAgentWorkspace = agentWorkspaces[activeAgent]
+  const activeSessionId = activeAgentWorkspace.activeSessionId
+  const activeSession = activeAgentWorkspace.sessions[activeSessionId]
+  const agentSessions = Object.values(activeAgentWorkspace.sessions)
   const {
-    message,
+    draft: message,
     modelPreference,
     messages,
     route,
@@ -784,37 +949,43 @@ function App() {
     budget,
     budgetEditing,
     budgetDraft,
-  } = activeWorkspace
+  } = activeSession
 
-  const updateWorkspace = (agentId, updater) => {
+  const updateSession = (agentId, sessionId, updater) => {
     setAgentWorkspaces((currentWorkspaces) => ({
       ...currentWorkspaces,
-      [agentId]: updater(currentWorkspaces[agentId]),
+      [agentId]: {
+        ...currentWorkspaces[agentId],
+        sessions: {
+          ...currentWorkspaces[agentId].sessions,
+          [sessionId]: updater(currentWorkspaces[agentId].sessions[sessionId]),
+        },
+      },
     }))
   }
 
-  const setWorkspaceField = (agentId, field, value) => {
-    updateWorkspace(agentId, (workspace) => ({
-      ...workspace,
-      [field]: typeof value === 'function' ? value(workspace[field]) : value,
+  const setSessionField = (agentId, sessionId, field, value) => {
+    updateSession(agentId, sessionId, (session) => ({
+      ...session,
+      [field]: typeof value === 'function' ? value(session[field]) : value,
     }))
   }
 
-  const setActiveWorkspaceField = (field, value) => {
-    setWorkspaceField(activeAgent, field, value)
+  const setActiveSessionField = (field, value) => {
+    setSessionField(activeAgent, activeSessionId, field, value)
   }
 
-  const setMessage = (value) => setActiveWorkspaceField('message', value)
-  const setModelPreference = (value) => setActiveWorkspaceField('modelPreference', value)
-  const setMessages = (value) => setActiveWorkspaceField('messages', value)
-  const setRoute = (value) => setActiveWorkspaceField('route', value)
-  const setProcessing = (value) => setActiveWorkspaceField('processing', value)
-  const setRouteStage = (value) => setActiveWorkspaceField('routeStage', value)
-  const setSessionStats = (value) => setActiveWorkspaceField('sessionStats', value)
-  const setHistory = (value) => setActiveWorkspaceField('history', value)
-  const setBudget = (value) => setActiveWorkspaceField('budget', value)
-  const setBudgetEditing = (value) => setActiveWorkspaceField('budgetEditing', value)
-  const setBudgetDraft = (value) => setActiveWorkspaceField('budgetDraft', value)
+  const setMessage = (value) => setActiveSessionField('draft', value)
+  const setModelPreference = (value) => setActiveSessionField('modelPreference', value)
+  const setMessages = (value) => setActiveSessionField('messages', value)
+  const setRoute = (value) => setActiveSessionField('route', value)
+  const setProcessing = (value) => setActiveSessionField('processing', value)
+  const setRouteStage = (value) => setActiveSessionField('routeStage', value)
+  const setSessionStats = (value) => setActiveSessionField('sessionStats', value)
+  const setHistory = (value) => setActiveSessionField('history', value)
+  const setBudget = (value) => setActiveSessionField('budget', value)
+  const setBudgetEditing = (value) => setActiveSessionField('budgetEditing', value)
+  const setBudgetDraft = (value) => setActiveSessionField('budgetDraft', value)
   const selectedAgent = agents.find((agent) => agent.id === activeAgent) || agents[0]
   const escalationPreview = route && routeStage === 'escalating'
     ? escalateRoute(
@@ -837,7 +1008,7 @@ function App() {
     if (container) {
       container.scrollTop = container.scrollHeight
     }
-  }, [activeAgent, messages, processing, routeStage])
+  }, [activeAgent, activeSessionId, messages, processing, routeStage])
 
   const saveBudget = () => {
     const newBudget = Number(budgetDraft)
@@ -854,17 +1025,100 @@ function App() {
     setBudgetEditing(false)
   }
 
-  const handleNewSessionPlaceholder = () => undefined
+  const handleCreateSession = () => {
+    if (processing) return
+
+    const newSession = createEmptySession(activeAgent)
+    sessionGenerations.current[newSession.id] = 0
+    setAgentWorkspaces((currentWorkspaces) => ({
+      ...currentWorkspaces,
+      [activeAgent]: {
+        activeSessionId: newSession.id,
+        sessions: {
+          ...currentWorkspaces[activeAgent].sessions,
+          [newSession.id]: newSession,
+        },
+      },
+    }))
+    setHistoryOpen(false)
+    setModelMenuOpen(false)
+    setSessionMenuOpen(false)
+  }
+
+  const handleSelectSession = (sessionId) => {
+    if (processing || sessionId === activeSessionId) {
+      setSessionMenuOpen(false)
+      return
+    }
+
+    setAgentWorkspaces((currentWorkspaces) => ({
+      ...currentWorkspaces,
+      [activeAgent]: {
+        ...currentWorkspaces[activeAgent],
+        activeSessionId: sessionId,
+      },
+    }))
+    setHistoryOpen(false)
+    setModelMenuOpen(false)
+    setSessionMenuOpen(false)
+  }
+
+  const handleDeleteSession = (sessionId) => {
+    if (processing) return
+
+    const sessionToDelete = activeAgentWorkspace.sessions[sessionId]
+    const confirmed = window.confirm(
+      `¿Quieres eliminar la sesión “${sessionToDelete.title}”? Esta acción no se puede deshacer.`,
+    )
+
+    if (!confirmed) return
+
+    sessionGenerations.current[sessionId] = (sessionGenerations.current[sessionId] || 0) + 1
+    setAgentWorkspaces((currentWorkspaces) => {
+      const workspace = currentWorkspaces[activeAgent]
+      const remainingSessions = Object.fromEntries(
+        Object.entries(workspace.sessions).filter(([id]) => id !== sessionId),
+      )
+      const remainingIds = Object.keys(remainingSessions)
+
+      if (remainingIds.length === 0) {
+        const replacement = createEmptySession(activeAgent)
+        sessionGenerations.current[replacement.id] = 0
+
+        return {
+          ...currentWorkspaces,
+          [activeAgent]: {
+            activeSessionId: replacement.id,
+            sessions: { [replacement.id]: replacement },
+          },
+        }
+      }
+
+      return {
+        ...currentWorkspaces,
+        [activeAgent]: {
+          activeSessionId: workspace.activeSessionId === sessionId
+            ? remainingIds[0]
+            : workspace.activeSessionId,
+          sessions: remainingSessions,
+        },
+      }
+    })
+    setHistoryOpen(false)
+    setModelMenuOpen(false)
+  }
 
   const sendMessage = async () => {
     if (!message.trim() || processing) return
 
     const userMessage = message.trim()
     const requestAgent = activeAgent
+    const requestSessionId = activeSessionId
     const requestModelPreference = modelPreference
     const isAutoMode = requestModelPreference === 'auto'
-    const activeGeneration = sessionGenerations.current[requestAgent]
+    const activeGeneration = sessionGenerations.current[requestSessionId] || 0
     const isEscalation = userMessage === examples.escalation
+    const isFirstMessage = messages.length === 0
 
     setMessages((currentMessages) => [
       ...currentMessages,
@@ -874,13 +1128,15 @@ function App() {
       },
     ])
     setMessage('')
+    if (isFirstMessage) setActiveSessionField('title', generateSessionTitle(userMessage))
+    setActiveSessionField('updatedAt', Date.now())
     setProcessing(true)
     setRouteStage('analyzing')
     setModelMenuOpen(false)
 
     await new Promise((resolve) => setTimeout(resolve, 400))
 
-    if (activeGeneration !== sessionGenerations.current[requestAgent]) return
+    if (activeGeneration !== (sessionGenerations.current[requestSessionId] || 0)) return
 
     const classification = classifyTask(userMessage)
     const initialRoute = isAutoMode
@@ -893,19 +1149,19 @@ function App() {
 
     if (isEscalation && isAutoMode) {
       await new Promise((resolve) => setTimeout(resolve, 400))
-      if (activeGeneration !== sessionGenerations.current[requestAgent]) return
+      if (activeGeneration !== (sessionGenerations.current[requestSessionId] || 0)) return
 
       const initialResponse = 'Cuando una sesión expira, la aplicación puede solicitar un nuevo token y continuar.'
       const initialVerificationPassed = false
 
       setRouteStage('verifying')
       await new Promise((resolve) => setTimeout(resolve, 500))
-      if (activeGeneration !== sessionGenerations.current[requestAgent]) return
+      if (activeGeneration !== (sessionGenerations.current[requestSessionId] || 0)) return
 
       if (initialResponse && !initialVerificationPassed) {
         setRouteStage('escalating')
         await new Promise((resolve) => setTimeout(resolve, 500))
-        if (activeGeneration !== sessionGenerations.current[requestAgent]) return
+        if (activeGeneration !== (sessionGenerations.current[requestSessionId] || 0)) return
       }
 
       selectedRoute = escalateRoute(classification, requestAgent, initialRoute)
@@ -913,14 +1169,14 @@ function App() {
       setRouteStage('verifying')
 
       await new Promise((resolve) => setTimeout(resolve, 500))
-      if (activeGeneration !== sessionGenerations.current[requestAgent]) return
+      if (activeGeneration !== (sessionGenerations.current[requestSessionId] || 0)) return
     } else {
       await new Promise((resolve) => setTimeout(resolve, 100))
-      if (activeGeneration !== sessionGenerations.current[requestAgent]) return
+      if (activeGeneration !== (sessionGenerations.current[requestSessionId] || 0)) return
 
       setRouteStage('verifying')
       await new Promise((resolve) => setTimeout(resolve, 100))
-      if (activeGeneration !== sessionGenerations.current[requestAgent]) return
+      if (activeGeneration !== (sessionGenerations.current[requestSessionId] || 0)) return
 
       selectedRoute = {
         ...initialRoute,
@@ -985,36 +1241,41 @@ function App() {
         createdAt,
       },
     ])
+    setActiveSessionField('updatedAt', Date.now())
     setProcessing(false)
   }
 
   useEffect(() => {
-    if (!historyOpen) return undefined
+    if (!historyOpen && !sessionMenuOpen) return undefined
 
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
         setHistoryOpen(false)
+        setSessionMenuOpen(false)
       }
     }
 
     document.addEventListener('keydown', handleKeyDown)
 
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [historyOpen])
+  }, [historyOpen, sessionMenuOpen])
 
   const resetSession = () => {
+    if (processing) return
+
     const confirmed = window.confirm(
       '¿Quieres reiniciar la sesión? Se eliminará el historial y las métricas actuales.',
     )
 
     if (!confirmed) return
 
-    sessionGenerations.current[activeAgent] += 1
-    setAgentWorkspaces((currentWorkspaces) => ({
-      ...currentWorkspaces,
-      [activeAgent]: createEmptyWorkspace(),
+    sessionGenerations.current[activeSessionId] = (sessionGenerations.current[activeSessionId] || 0) + 1
+    updateSession(activeAgent, activeSessionId, (currentSession) => ({
+      ...createEmptySession(activeAgent, activeSessionId),
+      createdAt: currentSession.createdAt,
     }))
     setHistoryOpen(false)
+    setModelMenuOpen(false)
   }
 
   return (
@@ -1055,14 +1316,17 @@ function App() {
         <AgentHub
           activeAgent={activeAgent}
           onSelectAgent={(agentId) => {
+            if (processing) return
             setModelMenuOpen(false)
+            setSessionMenuOpen(false)
+            setHistoryOpen(false)
             setActiveAgent(agentId)
           }}
-          onNewSession={handleNewSessionPlaceholder}
+          onNewSession={handleCreateSession}
           selectionDisabled={processing}
         />
 
-      <main key={activeAgent} className="workspace-main workspace-switch">
+      <main key={`${activeAgent}-${activeSessionId}`} className="workspace-main workspace-switch">
         <section className="relative flex h-[calc(100vh-8rem)] min-h-[600px] min-w-0 flex-col md:h-full md:min-h-0 md:overflow-hidden">
           <div className="absolute -left-5 top-1 hidden h-28 flex-col items-center justify-between md:flex">
             <span className="absolute top-1 bottom-1 w-px bg-white/[0.06]" />
@@ -1077,25 +1341,18 @@ function App() {
               <p className="text-[11px] uppercase tracking-[0.18em] text-[#626467]">
                 Nueva conversación
               </p>
-              <div
+              <SessionSwitcher
                 key={activeAgent}
-                className={`active-agent-context active-agent-context--${selectedAgent.avatar.color} hidden md:flex`}
-                aria-label={`Agente activo: ${selectedAgent.name}`}
-              >
-                <AgentAvatar
-                  {...selectedAgent.avatar}
-                  size="xs"
-                  active
-                  className="active-agent-context__avatar"
-                />
-                <div className="min-w-0 text-left">
-                  <p className="active-agent-context__label">Agente activo</p>
-                  <div className="active-agent-context__name-row">
-                    <span className="active-agent-context__accent" />
-                    <p className="active-agent-context__name">{selectedAgent.name}</p>
-                  </div>
-                </div>
-              </div>
+                agent={selectedAgent}
+                sessions={agentSessions}
+                activeSessionId={activeSessionId}
+                open={sessionMenuOpen}
+                disabled={processing}
+                onToggle={() => setSessionMenuOpen((current) => !current)}
+                onSelect={handleSelectSession}
+                onCreate={handleCreateSession}
+                onDelete={handleDeleteSession}
+              />
             </div>
 
             <h1 className="text-3xl font-medium tracking-[-0.03em] text-[#F4F4F2]">
@@ -1877,7 +2134,8 @@ function App() {
                   <button
                     type="button"
                     onClick={resetSession}
-                    className="mt-4 text-sm text-[#A1A6AE] transition-colors duration-150 hover:text-[#D6A24A]"
+                    disabled={processing}
+                    className="mt-4 text-sm text-[#A1A6AE] transition-colors duration-150 hover:text-[#D6A24A] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     ↻ Reiniciar sesión
                   </button>

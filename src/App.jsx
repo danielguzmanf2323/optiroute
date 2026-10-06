@@ -94,6 +94,58 @@ export const agentPresets = {
   },
 }
 
+const agents = [
+  {
+    id: 'global',
+    name: 'OptiRoute Global',
+    type: 'global',
+    description: 'Todos los proveedores',
+    avatar: { shape: 'roundedSquare', color: 'blue', accessory: 'hat', mood: 'focused' },
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    type: 'provider',
+    description: 'Proveedor',
+    avatar: { shape: 'circle', color: 'teal', accessory: 'visor', mood: 'focused' },
+  },
+  {
+    id: 'google',
+    name: 'Google',
+    type: 'provider',
+    description: 'Proveedor',
+    avatar: { shape: 'roundedSquare', color: 'blue', accessory: 'antenna', mood: 'happy' },
+  },
+  {
+    id: 'anthropic',
+    name: 'Anthropic',
+    type: 'provider',
+    description: 'Proveedor',
+    avatar: { shape: 'diamond', color: 'purple', accessory: 'halo', mood: 'neutral' },
+  },
+  {
+    id: 'meta',
+    name: 'Meta',
+    type: 'provider',
+    description: 'Proveedor',
+    avatar: { shape: 'triangle', color: 'blue', accessory: 'visor', mood: 'focused' },
+  },
+  {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    type: 'provider',
+    description: 'Proveedor',
+    avatar: { shape: 'circle', color: 'orange', accessory: 'hat', mood: 'neutral' },
+  },
+  {
+    id: 'kimi',
+    name: 'Kimi',
+    type: 'provider',
+    description: 'Proveedor',
+    avatar: { shape: 'roundedSquare', color: 'amber', accessory: 'halo', mood: 'happy' },
+  },
+]
+
 function AgentAvatar({
   shape = 'circle',
   color = 'blue',
@@ -119,7 +171,11 @@ function AgentAvatar({
       </span>
 
       {accessory === 'hat' && (
-        <span className="agent-hat"><span /></span>
+        <span className="agent-hat">
+          <span className="agent-hat__crown" />
+          <span className="agent-hat__band" />
+          <span className="agent-hat__brim" />
+        </span>
       )}
       {accessory === 'visor' && <span className="agent-visor" />}
       {accessory === 'antenna' && <span className="agent-antenna" />}
@@ -128,17 +184,86 @@ function AgentAvatar({
   )
 }
 
-function OptiRouteMascot({ size = 'sm', active = false, mood = 'neutral', className = '' }) {
+function OptiRouteMascot({ size = 'sm', active = false, mood = 'neutral', accessory = 'halo', className = '' }) {
   return (
     <AgentAvatar
       shape="roundedSquare"
       color="blue"
-      accessory="halo"
+      accessory={accessory}
       mood={mood}
       size={size}
       active={active}
       className={`opti-mascot ${className}`}
     />
+  )
+}
+
+function AgentHub({ activeAgent, onSelectAgent, onNewSession }) {
+  const globalAgent = agents[0]
+  const providerAgents = agents.slice(1)
+
+  const renderAgentButton = (agent, index) => {
+    const isActive = activeAgent === agent.id
+
+    return (
+      <button
+        key={agent.id}
+        type="button"
+        aria-label={`Seleccionar agente ${agent.name}`}
+        aria-pressed={isActive}
+        onClick={() => onSelectAgent(agent.id)}
+        className={`agent-hub__button group ${isActive ? 'agent-hub__button--active' : ''}`}
+        style={{ '--agent-delay': `${index * 35}ms` }}
+      >
+        <span className="agent-hub__active-mark" />
+        {agent.type === 'global' ? (
+          <OptiRouteMascot
+            size="md"
+            active={isActive}
+            mood={agent.avatar.mood}
+            accessory={agent.avatar.accessory}
+            className="agent-hub__avatar agent-hub__avatar--global"
+          />
+        ) : (
+          <AgentAvatar
+            {...agent.avatar}
+            size="md"
+            active={isActive}
+            className="agent-hub__avatar"
+          />
+        )}
+        <span role="tooltip" className="agent-hub__tooltip">
+          <span>{agent.name}</span>
+          <span>{agent.description}</span>
+        </span>
+      </button>
+    )
+  }
+
+  return (
+    <aside className="agent-hub" aria-label="Agent Hub">
+      <nav className="flex flex-col items-center" aria-label="Agentes disponibles">
+        <span className="agent-hub__label">Agentes</span>
+        {renderAgentButton(globalAgent, 0)}
+        <span className="agent-hub__divider" />
+        <div className="flex flex-col items-center gap-3">
+          {providerAgents.map((agent, index) => renderAgentButton(agent, index + 1))}
+        </div>
+      </nav>
+
+      <button
+        type="button"
+        onClick={onNewSession}
+        aria-label="Nueva sesión"
+        className="agent-hub__new-session group"
+      >
+        <span aria-hidden="true">+</span>
+        <span role="tooltip" className="agent-hub__tooltip agent-hub__tooltip--bottom">
+          <span>Nueva sesión</span>
+          <span>Próximamente</span>
+        </span>
+      </button>
+    </aside>
   )
 }
 
@@ -233,6 +358,7 @@ function getAssistantResponse(userMessage) {
 }
 
 function App() {
+  const [activeAgent, setActiveAgent] = useState('global')
   const [message, setMessage] = useState('')
   const [messages, setMessages] = useState([])
   const [route, setRoute] = useState(null)
@@ -251,6 +377,7 @@ function App() {
   const [budgetDraft, setBudgetDraft] = useState('0.1000')
   const sessionGeneration = useRef(0)
   const messagesContainerRef = useRef(null)
+  const selectedAgent = agents.find((agent) => agent.id === activeAgent) || agents[0]
 
   const spent = sessionStats.optiRouteCost
   const remaining = Math.max(budget - spent, 0)
@@ -281,6 +408,8 @@ function App() {
     setBudgetDraft(budget.toFixed(4))
     setBudgetEditing(false)
   }
+
+  const handleNewSessionPlaceholder = () => undefined
 
   const sendMessage = async () => {
     if (!message.trim() || processing) return
@@ -459,7 +588,14 @@ function App() {
         </div>
       </header>
 
-      <main className="mx-auto grid w-full max-w-[1400px] grid-cols-1 gap-8 px-6 py-8 md:h-[calc(100vh-64px)] md:min-h-0 md:grid-cols-[minmax(0,1fr)_340px] md:gap-10 md:overflow-hidden md:px-8 md:py-10">
+      <div className="workspace-layout">
+        <AgentHub
+          activeAgent={activeAgent}
+          onSelectAgent={setActiveAgent}
+          onNewSession={handleNewSessionPlaceholder}
+        />
+
+      <main className="workspace-main">
         <section className="relative flex h-[calc(100vh-8rem)] min-h-[600px] min-w-0 flex-col md:h-full md:min-h-0 md:overflow-hidden">
           <div className="absolute -left-5 top-1 hidden h-28 flex-col items-center justify-between md:flex">
             <span className="absolute top-1 bottom-1 w-px bg-white/[0.06]" />
@@ -470,9 +606,15 @@ function App() {
           </div>
 
           <div className="chat-heading-glow relative isolate shrink-0">
-            <p className="mb-3 text-[11px] uppercase tracking-[0.18em] text-[#626467]">
-              Nueva conversación
-            </p>
+            <div className="mb-3 flex items-end justify-between gap-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-[#626467]">
+                Nueva conversación
+              </p>
+              <div className="hidden text-right md:block">
+                <p className="text-[8px] uppercase tracking-[0.18em] text-white/25">Agente</p>
+                <p className="mt-0.5 text-[10px] text-white/45">{selectedAgent.name}</p>
+              </div>
+            </div>
 
             <h1 className="text-3xl font-medium tracking-[-0.03em] text-[#F4F4F2]">
               Hola, ¿qué quieres resolver?
@@ -639,6 +781,13 @@ function App() {
                 <p className="mt-1 text-[9px] uppercase tracking-[0.14em] text-[#6F757D]">
                   OptiRoute Decision Layer
                 </p>
+                <div className="mt-3 flex items-center gap-2 text-[9px] uppercase tracking-[0.14em]">
+                  <span className="text-white/25">Contexto</span>
+                  <span className="h-px w-3 bg-white/[0.08]" />
+                  <span className="normal-case tracking-normal text-white/45">
+                    {selectedAgent.id === 'global' ? 'Global' : selectedAgent.name}
+                  </span>
+                </div>
               </div>
 
               <OptiRouteMascot
@@ -846,6 +995,7 @@ function App() {
           </p>
         </div>
       </main>
+      </div>
 
       <div
         className={`fixed inset-0 z-50 ${historyOpen ? 'history-is-open pointer-events-auto' : 'pointer-events-none'}`}

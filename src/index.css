@@ -64,6 +64,10 @@ body {
   padding: 32px 24px;
 }
 
+.workspace-switch {
+  animation: workspaceSwitch 150ms ease-out both;
+}
+
 .agent-hub {
   position: relative;
   z-index: 20;
@@ -112,6 +116,16 @@ body {
 .agent-hub__button:hover {
   background: rgba(255, 255, 255, 0.03);
   box-shadow: 0 0 20px rgba(123, 198, 255, 0.025);
+}
+
+.agent-hub__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.agent-hub__button:disabled:hover {
+  background: transparent;
+  box-shadow: none;
 }
 
 .agent-hub__button--active {
@@ -785,6 +799,11 @@ body {
   to { opacity: 1; }
 }
 
+@keyframes workspaceSwitch {
+  from { opacity: 0.96; }
+  to { opacity: 1; }
+}
+
 @keyframes agentHubItemEnter {
   from { opacity: 0; transform: translateY(3px); }
   to { opacity: 1; transform: translateY(0); }
@@ -876,6 +895,10 @@ body {
   .agent-hub,
   .agent-hub__button,
   .agent-hub__button--active::after {
+    animation: none;
+  }
+
+  .workspace-switch {
     animation: none;
   }
 

@@ -7,49 +7,94 @@ const examples = {
   escalation: 'Explícame de forma breve cómo debería manejar una aplicación la renovación segura de tokens cuando una sesión expira.',
 }
 
-const routes = {
-  simple: {
-    model: 'GPT 5.6 Luna',
-    complexity: 'Baja',
-    saving: '94%',
-    estimatedCost: '$0.0002',
-    baselineCost: '$0.0032',
-    baselineModel: 'GPT 5.6 Sol',
-    reason: 'La tarea requiere poco razonamiento y contexto. Un modelo ligero puede resolverla sin utilizar capacidad premium.',
+const providerCatalog = {
+  openai: {
+    name: 'OpenAI',
+    premiumReference: {
+      name: 'GPT 5.6 Sol',
+      costs: { low: 0.0032, medium: 0.012, high: 0.03 },
+    },
+    models: [
+      { id: 'gpt-5-6-luna', provider: 'openai', name: 'GPT 5.6 Luna', tier: 'efficient', complexity: 'low', estimatedCost: 0.0002 },
+      { id: 'gpt-5-6-sol', provider: 'openai', name: 'GPT 5.6 Sol', tier: 'balanced', complexity: 'medium', estimatedCost: 0.006 },
+      { id: 'gpt-5-6-sol-max-demo', provider: 'openai', name: 'GPT 5.6 Sol Max (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.016 },
+    ],
   },
-  intermediate: {
-    model: 'Claude Haiku 4.5',
-    complexity: 'Media',
-    saving: '75%',
-    estimatedCost: '$0.0030',
-    baselineCost: '$0.0120',
-    baselineModel: 'GPT 5.6 Sol',
-    reason: 'La tarea necesita razonamiento técnico, pero no justifica todavía el costo de un modelo premium.',
+  google: {
+    name: 'Google',
+    premiumReference: {
+      name: 'Google Premium Reference (Demo)',
+      costs: { low: 0.004, medium: 0.014, high: 0.032 },
+    },
+    models: [
+      { id: 'gemini-flash-lite-demo', provider: 'google', name: 'Gemini Flash Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0004 },
+      { id: 'gemini-2-5-flash-demo', provider: 'google', name: 'Gemini 2.5 Flash (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.004 },
+      { id: 'gemini-2-5-pro', provider: 'google', name: 'Gemini 2.5 Pro', tier: 'premium', complexity: 'high', estimatedCost: 0.012 },
+    ],
   },
-  complex: {
-    model: 'Gemini 2.5 Pro',
-    complexity: 'Alta',
-    saving: '60%',
-    estimatedCost: '$0.0120',
-    baselineCost: '$0.0300',
-    baselineModel: 'GPT 5.6 Sol',
-    reason: 'La tarea requiere mayor contexto y capacidad de análisis. OptiRoute seleccionó un modelo más potente manteniendo un costo inferior a la referencia premium.',
+  anthropic: {
+    name: 'Anthropic',
+    premiumReference: {
+      name: 'Anthropic Premium Reference (Demo)',
+      costs: { low: 0.0042, medium: 0.012, high: 0.031 },
+    },
+    models: [
+      { id: 'claude-haiku-eco-demo', provider: 'anthropic', name: 'Claude Haiku Eco (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0006 },
+      { id: 'claude-haiku-4-5', provider: 'anthropic', name: 'Claude Haiku 4.5', tier: 'balanced', complexity: 'medium', estimatedCost: 0.003 },
+      { id: 'claude-sonnet-route-demo', provider: 'anthropic', name: 'Claude Sonnet Route (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.014 },
+    ],
+  },
+  meta: {
+    name: 'Meta',
+    premiumReference: {
+      name: 'Meta Premium Reference (Demo)',
+      costs: { low: 0.0018, medium: 0.006, high: 0.018 },
+    },
+    models: [
+      { id: 'meta-route-lite-demo', provider: 'meta', name: 'Meta Route Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0001 },
+      { id: 'meta-route-core-demo', provider: 'meta', name: 'Meta Route Core (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.0018 },
+      { id: 'meta-route-pro-demo', provider: 'meta', name: 'Meta Route Pro (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.0065 },
+    ],
+  },
+  deepseek: {
+    name: 'DeepSeek',
+    premiumReference: {
+      name: 'DeepSeek Premium Reference (Demo)',
+      costs: { low: 0.0015, medium: 0.005, high: 0.016 },
+    },
+    models: [
+      { id: 'deepseek-route-lite-demo', provider: 'deepseek', name: 'DeepSeek Route Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0001 },
+      { id: 'deepseek-route-core-demo', provider: 'deepseek', name: 'DeepSeek Route Core (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.0015 },
+      { id: 'deepseek-route-pro-demo', provider: 'deepseek', name: 'DeepSeek Route Pro (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.0055 },
+    ],
+  },
+  kimi: {
+    name: 'Kimi',
+    premiumReference: {
+      name: 'Kimi Premium Reference (Demo)',
+      costs: { low: 0.002, medium: 0.007, high: 0.02 },
+    },
+    models: [
+      { id: 'kimi-route-lite-demo', provider: 'kimi', name: 'Kimi Route Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0002 },
+      { id: 'kimi-route-core-demo', provider: 'kimi', name: 'Kimi Route Core (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.0022 },
+      { id: 'kimi-route-pro-demo', provider: 'kimi', name: 'Kimi Route Pro (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.0075 },
+    ],
   },
 }
 
-const escalatedRoute = {
-  model: 'Claude Haiku 4.5',
-  complexity: 'Media',
-  estimatedCost: '$0.0032',
-  baselineCost: '$0.0120',
-  baselineModel: 'GPT 5.6 Sol',
-  saving: '73.3%',
-  reason: 'La primera respuesta no alcanzó el criterio de calidad definido. OptiRoute escaló automáticamente a un modelo con mayor capacidad.',
-  initialModel: 'GPT 5.6 Luna',
-  initialCost: '$0.0002',
-  escalated: true,
-  verification: 'Superada',
+const globalRoutePreferences = {
+  low: 'gpt-5-6-luna',
+  medium: 'claude-haiku-4-5',
+  high: 'gemini-2-5-pro',
 }
+
+const globalPremiumReference = {
+  name: 'GPT 5.6 Sol',
+  costs: { low: 0.0032, medium: 0.012, high: 0.03 },
+}
+
+const complexityOrder = ['low', 'medium', 'high']
+const complexityLabels = { low: 'Baja', medium: 'Media', high: 'Alta' }
 
 function parseCost(value) {
   return Number(value.replace('$', ''))
@@ -57,6 +102,121 @@ function parseCost(value) {
 
 function formatCost(value) {
   return `$${value.toFixed(4)}`
+}
+
+function getAvailableModels(activeAgent) {
+  if (activeAgent === 'global') {
+    return Object.values(providerCatalog).flatMap((provider) => provider.models)
+  }
+
+  return providerCatalog[activeAgent]?.models || []
+}
+
+function getModelById(modelId) {
+  return Object.values(providerCatalog)
+    .flatMap((provider) => provider.models)
+    .find((model) => model.id === modelId)
+}
+
+function getPremiumReference(activeAgent, complexity) {
+  const reference = activeAgent === 'global'
+    ? globalPremiumReference
+    : providerCatalog[activeAgent].premiumReference
+
+  return {
+    model: reference.name,
+    cost: reference.costs[complexity],
+  }
+}
+
+function formatSaving(estimatedCost, baselineCost, escalated = false) {
+  const percentage = Math.max(0, (1 - estimatedCost / baselineCost) * 100)
+  return escalated ? `${percentage.toFixed(1)}%` : `${Math.round(percentage)}%`
+}
+
+function createRoute(model, classification, activeAgent, options = {}) {
+  const provider = providerCatalog[model.provider]
+  const estimatedCost = options.estimatedCost ?? model.estimatedCost
+  const reference = getPremiumReference(activeAgent, model.complexity)
+  const restricted = activeAgent !== 'global'
+  const escalated = options.escalated === true
+
+  let reason
+
+  if (escalated) {
+    reason = restricted
+      ? `La verificación inicial no fue superada. OptiRoute escaló dentro de ${provider.name} sin salir del proveedor permitido.`
+      : `La verificación inicial no fue superada. OptiRoute escaló de ${options.initialProviderName} a ${provider.name} para aumentar la capacidad de la ruta.`
+  } else {
+    reason = restricted
+      ? `El contexto está restringido a ${provider.name}. OptiRoute seleccionó la opción más eficiente disponible para esta complejidad.`
+      : `OptiRoute seleccionó ${provider.name} y ${model.name} por ofrecer capacidad suficiente para la tarea con un costo inferior a la referencia premium.`
+  }
+
+  return {
+    provider: model.provider,
+    providerName: provider.name,
+    contextAgent: activeAgent,
+    model: model.name,
+    modelId: model.id,
+    tier: model.tier,
+    complexity: complexityLabels[model.complexity],
+    complexityId: model.complexity,
+    taskType: classification.type,
+    intent: classification.intent,
+    estimatedCost: formatCost(estimatedCost),
+    baselineCost: formatCost(reference.cost),
+    baselineModel: reference.model,
+    saving: formatSaving(estimatedCost, reference.cost, escalated),
+    reason,
+    escalated,
+    verification: options.verification,
+    initialModel: options.initialModel,
+    initialProvider: options.initialProvider,
+    initialProviderName: options.initialProviderName,
+    initialCost: options.initialCost,
+  }
+}
+
+function selectRoute(classification, activeAgent) {
+  const availableModels = getAvailableModels(activeAgent)
+  const preferredModel = activeAgent === 'global'
+    ? getModelById(globalRoutePreferences[classification.complexity])
+    : availableModels
+      .filter((model) => model.complexity === classification.complexity)
+      .sort((first, second) => first.estimatedCost - second.estimatedCost)[0]
+
+  return createRoute(preferredModel, classification, activeAgent)
+}
+
+function escalateRoute(classification, activeAgent, initialRoute) {
+  const nextComplexityIndex = Math.min(
+    complexityOrder.indexOf(classification.complexity) + 1,
+    complexityOrder.length - 1,
+  )
+  const nextComplexity = complexityOrder[nextComplexityIndex]
+  const availableModels = getAvailableModels(activeAgent)
+  const escalatedModel = activeAgent === 'global'
+    ? getModelById(globalRoutePreferences[nextComplexity])
+    : availableModels
+      .filter((model) => model.complexity === nextComplexity)
+      .sort((first, second) => first.estimatedCost - second.estimatedCost)[0]
+  const combinedCost = parseCost(initialRoute.estimatedCost) + escalatedModel.estimatedCost
+
+  return createRoute(
+    escalatedModel,
+    { ...classification, complexity: nextComplexity },
+    activeAgent,
+    {
+      escalated: true,
+      verification: 'Superada',
+      estimatedCost: combinedCost,
+      initialModel: initialRoute.model,
+      initialProvider: initialRoute.provider,
+      initialProviderName: initialRoute.providerName,
+      initialCost: initialRoute.estimatedCost,
+    },
+  )
 }
 
 function getHistoryLabel(prompt) {
@@ -198,7 +358,7 @@ function OptiRouteMascot({ size = 'sm', active = false, mood = 'neutral', access
   )
 }
 
-function AgentHub({ activeAgent, onSelectAgent, onNewSession }) {
+function AgentHub({ activeAgent, onSelectAgent, onNewSession, selectionDisabled }) {
   const globalAgent = agents[0]
   const providerAgents = agents.slice(1)
 
@@ -211,6 +371,7 @@ function AgentHub({ activeAgent, onSelectAgent, onNewSession }) {
         type="button"
         aria-label={`Seleccionar agente ${agent.name}`}
         aria-pressed={isActive}
+        disabled={selectionDisabled && !isActive}
         onClick={() => onSelectAgent(agent.id)}
         className={`agent-hub__button group ${isActive ? 'agent-hub__button--active' : ''}`}
         style={{ '--agent-delay': `${index * 35}ms` }}
@@ -269,19 +430,19 @@ function AgentHub({ activeAgent, onSelectAgent, onNewSession }) {
 
 function classifyTask(userMessage) {
   if (userMessage === examples.escalation) {
-    return routes.simple
+    return { type: 'quality-escalation', complexity: 'low', intent: 'technical-guidance' }
   }
 
   if (userMessage === examples.short) {
-    return routes.simple
+    return { type: 'short-question', complexity: 'low', intent: 'explanation' }
   }
 
   if (userMessage === examples.code) {
-    return routes.intermediate
+    return { type: 'technical-analysis', complexity: 'medium', intent: 'diagnosis' }
   }
 
   if (userMessage === examples.document) {
-    return routes.complex
+    return { type: 'long-document', complexity: 'high', intent: 'analysis' }
   }
 
   const normalizedMessage = userMessage
@@ -293,13 +454,13 @@ function classifyTask(userMessage) {
   const isGreeting = /^(hola\b|buenos dias\b|buenas tardes\b|buenas noches\b)/.test(normalizedMessage)
 
   if (isGreeting) {
-    return routes.simple
+    return { type: 'greeting', complexity: 'low', intent: 'conversation' }
   }
 
   if (
     /documento largo|documentacion extensa|documentacion tecnica extensa|analisis profundo|informe completo|analiza este documento|analizar este documento|resumir documento|resumen de este documento|dependencias y riesgos|analizar documentacion|analisis documental/.test(normalizedMessage)
   ) {
-    return routes.complex
+    return { type: 'long-document', complexity: 'high', intent: 'analysis' }
   }
 
   if (userMessage.length > 1200) {
@@ -313,16 +474,18 @@ function classifyTask(userMessage) {
       braceCount >= 6 ||
       codeStructureCount >= 3
 
-    return hasStrongCodeSignal ? routes.intermediate : routes.complex
+    return hasStrongCodeSignal
+      ? { type: 'technical-analysis', complexity: 'medium', intent: 'diagnosis' }
+      : { type: 'long-document', complexity: 'high', intent: 'analysis' }
   }
 
   if (
     /\b(codigo|error|fastapi|python|javascript|react|sql|debug|debugging|token|401|backend|frontend|endpoint|funcion|function|classname|const|usestate)\b/.test(normalizedMessage)
   ) {
-    return routes.intermediate
+    return { type: 'technical-analysis', complexity: 'medium', intent: 'diagnosis' }
   }
 
-  return routes.simple
+  return { type: 'general-request', complexity: 'low', intent: 'assistance' }
 }
 
 function getAssistantResponse(userMessage) {
@@ -357,27 +520,119 @@ function getAssistantResponse(userMessage) {
   return 'OptiRoute ha analizado tu solicitud y seleccionado una ruta de IA de acuerdo con su complejidad.'
 }
 
+const initialSessionStats = {
+  requests: 0,
+  optiRouteCost: 0,
+  premiumCost: 0,
+  savings: 0,
+}
+
+function createEmptyWorkspace() {
+  return {
+    message: '',
+    messages: [],
+    route: null,
+    processing: false,
+    routeStage: 'idle',
+    sessionStats: { ...initialSessionStats },
+    history: [],
+    budget: 0.1,
+    budgetEditing: false,
+    budgetDraft: '0.1000',
+  }
+}
+
+function createAgentWorkspaces() {
+  return Object.fromEntries(agents.map((agent) => [agent.id, createEmptyWorkspace()]))
+}
+
+function AgentIdentity({ agentId, size = 'sm', active = false, mood }) {
+  const agent = agents.find((item) => item.id === agentId) || agents[0]
+
+  if (agent.id === 'global') {
+    return (
+      <OptiRouteMascot
+        size={size}
+        active={active}
+        mood={mood || agent.avatar.mood}
+        accessory={agent.avatar.accessory}
+      />
+    )
+  }
+
+  return (
+    <AgentAvatar
+      {...agent.avatar}
+      size={size}
+      active={active}
+      mood={mood || agent.avatar.mood}
+    />
+  )
+}
+
+function getAgentChatLabel(agentId) {
+  const agent = agents.find((item) => item.id === agentId) || agents[0]
+  return agent.id === 'global' ? 'OptiRoute' : `${agent.name} Agent`
+}
+
 function App() {
   const [activeAgent, setActiveAgent] = useState('global')
-  const [message, setMessage] = useState('')
-  const [messages, setMessages] = useState([])
-  const [route, setRoute] = useState(null)
-  const [processing, setProcessing] = useState(false)
-  const [routeStage, setRouteStage] = useState('idle')
-  const [sessionStats, setSessionStats] = useState({
-    requests: 0,
-    optiRouteCost: 0,
-    premiumCost: 0,
-    savings: 0,
-  })
-  const [history, setHistory] = useState([])
+  const [agentWorkspaces, setAgentWorkspaces] = useState(createAgentWorkspaces)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [budget, setBudget] = useState(0.1)
-  const [budgetEditing, setBudgetEditing] = useState(false)
-  const [budgetDraft, setBudgetDraft] = useState('0.1000')
-  const sessionGeneration = useRef(0)
+  const sessionGenerations = useRef(
+    Object.fromEntries(agents.map((agent) => [agent.id, 0])),
+  )
   const messagesContainerRef = useRef(null)
+  const activeWorkspace = agentWorkspaces[activeAgent]
+  const {
+    message,
+    messages,
+    route,
+    processing,
+    routeStage,
+    sessionStats,
+    history,
+    budget,
+    budgetEditing,
+    budgetDraft,
+  } = activeWorkspace
+
+  const updateWorkspace = (agentId, updater) => {
+    setAgentWorkspaces((currentWorkspaces) => ({
+      ...currentWorkspaces,
+      [agentId]: updater(currentWorkspaces[agentId]),
+    }))
+  }
+
+  const setWorkspaceField = (agentId, field, value) => {
+    updateWorkspace(agentId, (workspace) => ({
+      ...workspace,
+      [field]: typeof value === 'function' ? value(workspace[field]) : value,
+    }))
+  }
+
+  const setActiveWorkspaceField = (field, value) => {
+    setWorkspaceField(activeAgent, field, value)
+  }
+
+  const setMessage = (value) => setActiveWorkspaceField('message', value)
+  const setMessages = (value) => setActiveWorkspaceField('messages', value)
+  const setRoute = (value) => setActiveWorkspaceField('route', value)
+  const setProcessing = (value) => setActiveWorkspaceField('processing', value)
+  const setRouteStage = (value) => setActiveWorkspaceField('routeStage', value)
+  const setSessionStats = (value) => setActiveWorkspaceField('sessionStats', value)
+  const setHistory = (value) => setActiveWorkspaceField('history', value)
+  const setBudget = (value) => setActiveWorkspaceField('budget', value)
+  const setBudgetEditing = (value) => setActiveWorkspaceField('budgetEditing', value)
+  const setBudgetDraft = (value) => setActiveWorkspaceField('budgetDraft', value)
   const selectedAgent = agents.find((agent) => agent.id === activeAgent) || agents[0]
+  const escalationPreview = route && routeStage === 'escalating'
+    ? escalateRoute(
+      { type: route.taskType, complexity: route.complexityId, intent: route.intent },
+      route.contextAgent,
+      route,
+    )
+    : null
 
   const spent = sessionStats.optiRouteCost
   const remaining = Math.max(budget - spent, 0)
@@ -392,7 +647,7 @@ function App() {
     if (container) {
       container.scrollTop = container.scrollHeight
     }
-  }, [messages, processing, routeStage])
+  }, [activeAgent, messages, processing, routeStage])
 
   const saveBudget = () => {
     const newBudget = Number(budgetDraft)
@@ -415,7 +670,8 @@ function App() {
     if (!message.trim() || processing) return
 
     const userMessage = message.trim()
-    const activeGeneration = sessionGeneration.current
+    const requestAgent = activeAgent
+    const activeGeneration = sessionGenerations.current[requestAgent]
     const isEscalation = userMessage === examples.escalation
 
     setMessages((currentMessages) => [
@@ -431,9 +687,10 @@ function App() {
 
     await new Promise((resolve) => setTimeout(resolve, 400))
 
-    if (activeGeneration !== sessionGeneration.current) return
+    if (activeGeneration !== sessionGenerations.current[requestAgent]) return
 
-    const initialRoute = classifyTask(userMessage)
+    const classification = classifyTask(userMessage)
+    const initialRoute = selectRoute(classification, activeAgent)
     setRoute(initialRoute)
     setRouteStage('selected')
 
@@ -441,34 +698,34 @@ function App() {
 
     if (isEscalation) {
       await new Promise((resolve) => setTimeout(resolve, 400))
-      if (activeGeneration !== sessionGeneration.current) return
+      if (activeGeneration !== sessionGenerations.current[requestAgent]) return
 
       const initialResponse = 'Cuando una sesión expira, la aplicación puede solicitar un nuevo token y continuar.'
       const initialVerificationPassed = false
 
       setRouteStage('verifying')
       await new Promise((resolve) => setTimeout(resolve, 500))
-      if (activeGeneration !== sessionGeneration.current) return
+      if (activeGeneration !== sessionGenerations.current[requestAgent]) return
 
       if (initialResponse && !initialVerificationPassed) {
         setRouteStage('escalating')
         await new Promise((resolve) => setTimeout(resolve, 500))
-        if (activeGeneration !== sessionGeneration.current) return
+        if (activeGeneration !== sessionGenerations.current[requestAgent]) return
       }
 
-      selectedRoute = escalatedRoute
+      selectedRoute = escalateRoute(classification, activeAgent, initialRoute)
       setRoute(selectedRoute)
       setRouteStage('verifying')
 
       await new Promise((resolve) => setTimeout(resolve, 500))
-      if (activeGeneration !== sessionGeneration.current) return
+      if (activeGeneration !== sessionGenerations.current[requestAgent]) return
     } else {
       await new Promise((resolve) => setTimeout(resolve, 100))
-      if (activeGeneration !== sessionGeneration.current) return
+      if (activeGeneration !== sessionGenerations.current[requestAgent]) return
 
       setRouteStage('verifying')
       await new Promise((resolve) => setTimeout(resolve, 100))
-      if (activeGeneration !== sessionGeneration.current) return
+      if (activeGeneration !== sessionGenerations.current[requestAgent]) return
 
       selectedRoute = {
         ...initialRoute,
@@ -488,6 +745,7 @@ function App() {
       {
         role: 'assistant',
         content: assistantResponse,
+        agentId: requestAgent,
       },
     ])
     setRoute(selectedRoute)
@@ -505,6 +763,8 @@ function App() {
         prompt: userMessage,
         response: assistantResponse,
         model: selectedRoute.model,
+        provider: selectedRoute.provider,
+        providerName: selectedRoute.providerName,
         complexity: selectedRoute.complexity,
         estimatedCost,
         baselineCost,
@@ -512,6 +772,8 @@ function App() {
         savingAmount: baselineCost - estimatedCost,
         escalated: selectedRoute.escalated,
         initialModel: selectedRoute.escalated ? selectedRoute.initialModel : null,
+        initialProvider: selectedRoute.escalated ? selectedRoute.initialProvider : null,
+        initialProviderName: selectedRoute.escalated ? selectedRoute.initialProviderName : null,
         finalModel: selectedRoute.model,
         verification: selectedRoute.verification,
         createdAt,
@@ -541,21 +803,11 @@ function App() {
 
     if (!confirmed) return
 
-    sessionGeneration.current += 1
-    setMessages([])
-    setRoute(null)
-    setSessionStats({
-      requests: 0,
-      optiRouteCost: 0,
-      premiumCost: 0,
-      savings: 0,
-    })
-    setHistory([])
-    setMessage('')
-    setProcessing(false)
-    setRouteStage('idle')
-    setBudgetDraft(budget.toFixed(4))
-    setBudgetEditing(false)
+    sessionGenerations.current[activeAgent] += 1
+    setAgentWorkspaces((currentWorkspaces) => ({
+      ...currentWorkspaces,
+      [activeAgent]: createEmptyWorkspace(),
+    }))
     setHistoryOpen(false)
   }
 
@@ -593,9 +845,10 @@ function App() {
           activeAgent={activeAgent}
           onSelectAgent={setActiveAgent}
           onNewSession={handleNewSessionPlaceholder}
+          selectionDisabled={processing}
         />
 
-      <main className="workspace-main">
+      <main key={activeAgent} className="workspace-main workspace-switch">
         <section className="relative flex h-[calc(100vh-8rem)] min-h-[600px] min-w-0 flex-col md:h-full md:min-h-0 md:overflow-hidden">
           <div className="absolute -left-5 top-1 hidden h-28 flex-col items-center justify-between md:flex">
             <span className="absolute top-1 bottom-1 w-px bg-white/[0.06]" />
@@ -632,7 +885,9 @@ function App() {
                   Routing workspace
                 </p>
                 <p className="mt-2 text-[11px] text-[#6F757D]">
-                  Escribe una tarea y OptiRoute seleccionará la ruta de IA más eficiente.
+                  {activeAgent === 'global'
+                    ? 'Escribe una tarea y OptiRoute seleccionará la ruta de IA más eficiente.'
+                    : `Escribe una tarea y OptiRoute seleccionará la ruta más eficiente dentro de ${selectedAgent.name}.`}
                 </p>
               </div>
             )}
@@ -657,12 +912,12 @@ function App() {
                 ) : (
                   <div key={index} className="message-enter flex items-stretch gap-3">
                     <div className="flex flex-col items-center">
-                      <OptiRouteMascot size="sm" />
+                      <AgentIdentity agentId={item.agentId || activeAgent} size="sm" />
                       <span className="mt-2 w-px flex-1 bg-[#D6A24A]/25" />
                     </div>
                     <div className="min-w-0 pb-1">
                       <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.16em] text-[#D6A24A]/75">
-                        OptiRoute
+                        {getAgentChatLabel(item.agentId || activeAgent)}
                       </p>
                       <p className="max-w-2xl whitespace-pre-wrap break-words text-[15px] leading-7 text-[#E4E5E7] [overflow-wrap:anywhere]">
                         {item.content}
@@ -675,12 +930,12 @@ function App() {
               {processing && (
                 <div className="message-enter flex items-stretch gap-3">
                   <div className="flex flex-col items-center">
-                    <OptiRouteMascot size="sm" active mood="focused" />
+                    <AgentIdentity agentId={activeAgent} size="sm" active mood="focused" />
                     <span className="mt-2 w-px flex-1 bg-[#D6A24A]/25" />
                   </div>
                   <div className="min-w-0 pb-1">
                     <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.16em] text-[#D6A24A]/75">
-                      OptiRoute
+                      {getAgentChatLabel(activeAgent)}
                     </p>
                     <div className="flex items-center gap-3 text-[15px] leading-7 text-[#A1A6AE]">
                       <span>
@@ -865,7 +1120,7 @@ function App() {
                   : routeStage === 'analyzing'
                     ? 'Analizando solicitud'
                     : routeStage === 'selected'
-                      ? 'Modelo seleccionado'
+                      ? 'Buscando mejor ruta...'
                       : routeStage === 'verifying'
                         ? 'Verificando calidad'
                         : routeStage === 'escalating'
@@ -894,17 +1149,21 @@ function App() {
               <div className="route-item-reveal mt-4 rounded-lg border border-[#D6A24A]/15 bg-[#D6A24A]/[0.025] px-3 py-2.5">
                 <p className="text-[9px] uppercase tracking-[0.14em] text-[#6F757D]">Escalamiento activo</p>
                 <div className="mt-2 flex items-center gap-2 text-xs">
-                  <span className="text-[#A1A6AE]">GPT 5.6 Luna</span>
+                  <span className="text-[#A1A6AE]">{route?.providerName} · {route?.model}</span>
                   <span className="route-escalation-line h-px flex-1 bg-[#D6A24A]/60" />
-                  <span className="font-medium text-[#F3F2EE]">Claude Haiku 4.5</span>
+                  <span className="font-medium text-[#F3F2EE]">{escalationPreview?.providerName} · {escalationPreview?.model}</span>
                 </div>
               </div>
             )}
 
-            {route && routeStage !== 'analyzing' && (
+            {route && routeStage !== 'analyzing' && routeStage !== 'selected' && (
               <div key={`${route.model}-${route.estimatedCost}`} className="mt-6">
                 <section className="route-item-reveal rounded-xl border border-white/[0.07] bg-white/[0.018] p-4">
                   <p className="text-[9px] uppercase tracking-[0.15em] text-[#6F757D]">
+                    Proveedor seleccionado
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-[#D6A24A]/80">{route.providerName}</p>
+                  <p className="mt-3 text-[9px] uppercase tracking-[0.15em] text-[#6F757D]">
                     {route.escalated ? 'Modelo final' : 'Modelo seleccionado'}
                   </p>
                   <p className="mt-1 text-lg font-medium tracking-[-0.02em] text-[#F3F2EE]">{route.model}</p>
@@ -947,7 +1206,7 @@ function App() {
                           <div className="relative flex gap-3 pb-5">
                             <span className="relative z-10 mt-1 h-2.5 w-2.5 rounded-full border border-white/30 bg-[#A1A6AE]" />
                             <span className="absolute bottom-0 left-[5px] top-3 w-px bg-white/10" />
-                            <div><p className="text-sm font-medium">{route.initialModel}</p><p className="mt-1 text-[10px] text-[#6F757D]">Modelo inicial</p></div>
+                            <div><p className="text-sm font-medium">{route.initialProviderName} · {route.initialModel}</p><p className="mt-1 text-[10px] text-[#6F757D]">Proveedor y modelo inicial</p></div>
                           </div>
                           <div className="relative flex gap-3 pb-5">
                             <span className="relative z-10 mt-1 h-2.5 w-2.5 rounded-full border border-[#D6A24A]/50 bg-[#0D0F12]" />
@@ -957,7 +1216,7 @@ function App() {
                           <div className="relative flex gap-3 pb-5">
                             <span className={`relative z-10 mt-1 h-2.5 w-2.5 rounded-full border border-[#D6A24A]/60 bg-[#D6A24A] ${routeStage === 'escalating' ? 'route-node-pulse' : ''}`} />
                             <span className="absolute bottom-0 left-[5px] top-3 w-px bg-white/10" />
-                            <div><p className="text-sm font-medium">{route.model}</p><p className="mt-1 text-[10px] text-[#6F757D]">Modelo final</p></div>
+                            <div><p className="text-sm font-medium">{route.providerName} · {route.model}</p><p className="mt-1 text-[10px] text-[#6F757D]">Proveedor y modelo final</p></div>
                           </div>
                           <div className="flex gap-3">
                             <span className="relative z-10 mt-1 h-2.5 w-2.5 rounded-full border border-white/35 bg-[#A1A6AE]" />
@@ -1031,13 +1290,16 @@ function App() {
             <div className="p-6 sm:p-8">
               <div className="history-content-block history-delay-header flex items-start justify-between gap-5 border-b border-white/[0.08] pb-7">
                 <div className="flex min-w-0 items-start gap-3">
-                  <OptiRouteMascot size="sm" />
+                  <AgentIdentity agentId={activeAgent} size="sm" />
                   <div>
                     <h2 className="text-lg font-medium uppercase tracking-[0.04em] text-[#F3F2EE]">
                       Historial de sesión
                     </h2>
                     <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-white/30">
                       Session Intelligence
+                    </p>
+                    <p className="mt-2 text-[9px] uppercase tracking-[0.16em] text-white/35">
+                      Agente · <span className="normal-case tracking-normal text-white/55">{selectedAgent.name}</span>
                     </p>
                     <p className="mt-3 flex items-center gap-2 text-[9px] uppercase tracking-[0.18em] text-white/30">
                       <span className="h-1.5 w-1.5 rounded-full bg-[#D6A24A]/80" />
@@ -1244,7 +1506,7 @@ function App() {
 
                 {history.length === 0 ? (
                   <div className="py-12 text-center">
-                    <OptiRouteMascot size="md" />
+                    <AgentIdentity agentId={activeAgent} size="md" />
                     <p className="mt-5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/55">
                       Sin actividad todavía
                     </p>
@@ -1283,7 +1545,7 @@ function App() {
                               <span className="absolute bottom-2 left-[4px] top-2 w-px bg-white/10" />
                               <div className="relative flex items-center gap-3">
                                 <span className="z-10 h-2 w-2 rounded-full border border-white/25 bg-[#0D0F12]" />
-                                <p className="text-xs text-[#D3D5D8]">{entry.initialModel}</p>
+                                <p className="text-xs text-[#D3D5D8]">{entry.initialProviderName} · {entry.initialModel}</p>
                               </div>
                               <div className="relative flex items-start gap-3">
                                 <span className="z-10 mt-1 h-2 w-2 rounded-full border border-[#D6A24A]/50 bg-[#0D0F12]" />
@@ -1291,7 +1553,7 @@ function App() {
                               </div>
                               <div className="relative flex items-center gap-3">
                                 <span className="z-10 h-2 w-2 rounded-full bg-[#D6A24A]/80" />
-                                <p className="text-xs font-medium text-[#F3F2EE]">{entry.finalModel}</p>
+                                <p className="text-xs font-medium text-[#F3F2EE]">{entry.providerName} · {entry.finalModel}</p>
                               </div>
                               <div className="relative flex items-start gap-3">
                                 <span className="z-10 mt-1 h-2 w-2 rounded-full border border-white/30 bg-[#A1A6AE]" />
@@ -1309,7 +1571,7 @@ function App() {
                                     ? 'bg-[#D6A24A]/80'
                                     : 'bg-[#F3F2EE]/70'
                               }`} />
-                              <span className="truncate">{entry.model}</span>
+                              <span className="truncate">{entry.providerName} · {entry.model}</span>
                             </p>
                             <span className="shrink-0 text-xs text-white/35">
                               {entry.complexity}

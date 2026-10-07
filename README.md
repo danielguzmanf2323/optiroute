@@ -1,4 +1,19 @@
-# React + Vite
+# OptiRoute
+
+## Fuente de routing
+
+El frontend usa el motor Demo de React por defecto, incluido cuando no existen variables de entorno. Para trabajar con FastAPI, crea un archivo `.env.local` en la raíz:
+
+```dotenv
+VITE_ROUTING_SOURCE=backend
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
+
+Reinicia Vite después de cambiar estas variables. Para volver al modo autónomo compatible con GitHub Pages, elimina `.env.local` o configura `VITE_ROUTING_SOURCE=demo`. Los archivos `*.local` están excluidos por `.gitignore`.
+
+El backend de esta fase solo decide la ruta. Las respuestas del chat, los tokens y las métricas continúan identificados como simulaciones de demostración; no se invocan APIs reales de proveedores.
+
+## React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 

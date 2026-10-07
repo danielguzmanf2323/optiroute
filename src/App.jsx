@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import {
+  requestRoutingDecision,
+  routingSource,
+} from './services/routingApi'
 
 const examples = {
   short: '¿Qué es una API REST y para qué sirve?',
@@ -96,6 +100,37 @@ const providerCatalog = {
       { id: 'kimi-route-pro-demo', provider: 'kimi', name: 'Kimi Route Pro (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.0075, capabilities: ['text', 'vision', 'documents'] },
     ],
   },
+}
+
+const isBackendRouting = routingSource === 'backend'
+
+const backendModelIdMap = {
+  'gpt-5.6-luna-demo': 'gpt-5-6-luna',
+  'gpt-5.6-sol-demo': 'gpt-5-6-sol',
+  'gpt-5.6-sol-max-demo': 'gpt-5-6-sol-max-demo',
+  'gemini-flash-lite-demo': 'gemini-flash-lite-demo',
+  'gemini-2.5-flash-demo': 'gemini-2-5-flash-demo',
+  'gemini-2.5-pro-demo': 'gemini-2-5-pro',
+  'claude-haiku-eco-demo': 'claude-haiku-eco-demo',
+  'claude-haiku-4.5-demo': 'claude-haiku-4-5',
+  'claude-sonnet-route-demo': 'claude-sonnet-route-demo',
+  'deepseek-route-lite-demo': 'deepseek-route-lite-demo',
+  'deepseek-route-core-demo': 'deepseek-route-core-demo',
+  'deepseek-route-pro-demo': 'deepseek-route-pro-demo',
+  'kimi-route-lite-demo': 'kimi-route-lite-demo',
+  'kimi-route-core-demo': 'kimi-route-core-demo',
+  'kimi-route-pro-demo': 'kimi-route-pro-demo',
+}
+
+const backendModelIdByFrontendId = Object.fromEntries(
+  Object.entries(backendModelIdMap).map(([backendId, frontendId]) => [frontendId, backendId]),
+)
+
+const backendInputTypeLabels = {
+  text: 'Texto',
+  image: 'Imagen',
+  document: 'Documento',
+  multimodal: 'Multimodal',
 }
 
 const globalRoutePreferences = {
@@ -210,6 +245,70 @@ function getModelById(modelId) {
   return Object.values(providerCatalog)
     .flatMap((provider) => provider.models)
     .find((model) => model.id === modelId)
+}
+
+function getBackendInputType(attachments = []) {
+  const requirements = getAttachmentRequirements(attachments)
+  if (requirements.vision && requirements.documents) return 'multimodal'
+  if (requirements.vision) return 'image'
+  if (requirements.documents) return 'document'
+  return 'text'
+}
+
+function getBackendPreferredModelId(frontendModelId) {
+  if (frontendModelId === 'auto') return null
+  const backendModelId = backendModelIdByFrontendId[frontendModelId]
+  if (!backendModelId) {
+    throw new Error(`Incompatibilidad de catálogo: el modelo ${frontendModelId} no existe en OptiRoute API.`)
+  }
+  return backendModelId
+}
+
+function createBackendRoute(decision, activeAgent, mode) {
+  const frontendModelId = backendModelIdMap[decision?.model]
+  const model = frontendModelId ? getModelById(frontendModelId) : null
+  const provider = providerCatalog[decision?.provider]
+  const validComplexity = complexityOrder.includes(decision?.complexity)
+  const numericCosts = [
+    decision?.estimated_cost,
+    decision?.reference_cost,
+    decision?.estimated_savings,
+    decision?.savings_percent,
+  ]
+
+  if (!model || !provider || model.provider !== decision.provider) {
+    throw new Error(`Incompatibilidad de catálogo: OptiRoute API devolvió el modelo desconocido ${decision?.model || 'sin identificar'}.`)
+  }
+  if (!validComplexity || numericCosts.some((value) => !Number.isFinite(value))) {
+    throw new Error('OptiRoute API devolvió una decisión de routing incompleta.')
+  }
+
+  return {
+    provider: decision.provider,
+    providerName: provider.name,
+    contextAgent: activeAgent,
+    mode,
+    model: model.name,
+    modelId: model.id,
+    backendModelId: decision.model,
+    tier: model.tier,
+    complexity: complexityLabels[decision.complexity],
+    complexityId: decision.complexity,
+    taskType: 'backend-routing',
+    intent: 'routing-decision',
+    inputType: backendInputTypeLabels[decision.input_type] || decision.input_type,
+    requiredCapabilities: decision.required_capabilities,
+    estimatedCost: formatCost(decision.estimated_cost),
+    baselineCost: formatCost(decision.reference_cost),
+    baselineModel: 'Referencia demo del backend',
+    saving: `${Number(decision.savings_percent.toFixed(2))}%`,
+    savingAmount: decision.estimated_savings,
+    reason: decision.reason,
+    escalated: false,
+    verification: decision.verified ? 'Superada' : 'No superada',
+    demo: decision.demo === true,
+    routingSource: 'backend',
+  }
 }
 
 function getPremiumReference(activeAgent, complexity) {
@@ -725,6 +824,7 @@ function createEmptySession(agentId, sessionId = createSessionId(agentId)) {
     draft: '',
     draftAttachments: [],
     attachmentError: '',
+    routingError: '',
     modelPreference: 'auto',
     messages: [],
     route: null,
@@ -815,8 +915,9 @@ function serializeAgentWorkspaces(workspaces) {
           processing: false,
           budgetEditing: false,
           attachmentError: '',
+          routingError: '',
           draftAttachments: session.draftAttachments.map(serializeAttachment),
-          messages: session.messages.map((message) => ({
+          messages: session.messages.filter((message) => !message.pendingRouting).map((message) => ({
             ...message,
             attachments: (message.attachments || []).map(serializeAttachment),
           })),
@@ -857,6 +958,7 @@ function loadAgentWorkspaces() {
           routeStage,
           budgetEditing: false,
           attachmentError: '',
+          routingError: '',
           draftAttachments: (storedSession.draftAttachments || []).map(restoreAttachment),
           messages: (storedSession.messages || []).map((message) => ({
             ...message,
@@ -1293,6 +1395,7 @@ function App() {
   const [sessionMenuOpen, setSessionMenuOpen] = useState(false)
   const [isDraggingAttachments, setIsDraggingAttachments] = useState(false)
   const sessionGenerations = useRef({})
+  const pendingRoutingRequests = useRef(new Map())
   const messagesContainerRef = useRef(null)
   const fileInputRef = useRef(null)
   const textareaRef = useRef(null)
@@ -1305,6 +1408,7 @@ function App() {
     draft: message,
     draftAttachments,
     attachmentError,
+    routingError,
     modelPreference,
     messages,
     route,
@@ -1318,16 +1422,22 @@ function App() {
   } = activeSession
 
   const updateSession = (agentId, sessionId, updater) => {
-    setAgentWorkspaces((currentWorkspaces) => ({
-      ...currentWorkspaces,
-      [agentId]: {
-        ...currentWorkspaces[agentId],
-        sessions: {
-          ...currentWorkspaces[agentId].sessions,
-          [sessionId]: updater(currentWorkspaces[agentId].sessions[sessionId]),
+    setAgentWorkspaces((currentWorkspaces) => {
+      const workspace = currentWorkspaces[agentId]
+      const session = workspace?.sessions[sessionId]
+      if (!session) return currentWorkspaces
+
+      return {
+        ...currentWorkspaces,
+        [agentId]: {
+          ...workspace,
+          sessions: {
+            ...workspace.sessions,
+            [sessionId]: updater(session),
+          },
         },
-      },
-    }))
+      }
+    })
   }
 
   const setSessionField = (agentId, sessionId, field, value) => {
@@ -1344,25 +1454,18 @@ function App() {
   const setMessage = (value) => setActiveSessionField('draft', value)
   const setDraftAttachments = (value) => setActiveSessionField('draftAttachments', value)
   const setAttachmentError = (value) => setActiveSessionField('attachmentError', value)
+  const setRoutingError = (value) => setActiveSessionField('routingError', value)
   const setModelPreference = (value) => setActiveSessionField('modelPreference', value)
-  const setMessages = (value) => setActiveSessionField('messages', value)
-  const setRoute = (value) => setActiveSessionField('route', value)
-  const setProcessing = (value) => setActiveSessionField('processing', value)
-  const setRouteStage = (value) => setActiveSessionField('routeStage', value)
-  const setSessionStats = (value) => setActiveSessionField('sessionStats', value)
-  const setHistory = (value) => setActiveSessionField('history', value)
   const setBudget = (value) => setActiveSessionField('budget', value)
   const setBudgetEditing = (value) => setActiveSessionField('budgetEditing', value)
   const setBudgetDraft = (value) => setActiveSessionField('budgetDraft', value)
   const selectedAgent = agents.find((agent) => agent.id === activeAgent) || agents[0]
   const showHero = messages.length === 0
   const unavailableAttachmentError = getUnavailableAttachmentError(draftAttachments)
-  const routingCompatibilityError = getRoutingCompatibilityError(
-    activeAgent,
-    modelPreference,
-    draftAttachments,
-  )
-  const visibleAttachmentError = attachmentError || unavailableAttachmentError || routingCompatibilityError
+  const routingCompatibilityError = isBackendRouting
+    ? ''
+    : getRoutingCompatibilityError(activeAgent, modelPreference, draftAttachments)
+  const visibleAttachmentError = routingError || attachmentError || unavailableAttachmentError || routingCompatibilityError
   const latestUserMessage = [...messages].reverse().find((item) => item.role === 'user')
   const detectedInputType = draftAttachments.length > 0
     ? getAttachmentInputLabel(draftAttachments)
@@ -1406,6 +1509,8 @@ function App() {
   useEffect(() => () => {
     objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
     objectUrlsRef.current.clear()
+    pendingRoutingRequests.current.forEach((controller) => controller.abort())
+    pendingRoutingRequests.current.clear()
   }, [])
 
   useEffect(() => {
@@ -1479,6 +1584,7 @@ function App() {
 
     setDraftAttachments(nextAttachments)
     setAttachmentError(nextError)
+    setRoutingError('')
   }
 
   const removeAttachment = (attachmentId) => {
@@ -1490,11 +1596,10 @@ function App() {
     const nextAttachments = draftAttachments.filter((item) => item.id !== attachmentId)
     setDraftAttachments(nextAttachments)
     setAttachmentError('')
+    setRoutingError('')
   }
 
   const handleCreateSession = () => {
-    if (processing) return
-
     const newSession = createEmptySession(activeAgent)
     sessionGenerations.current[newSession.id] = 0
     setAgentWorkspaces((currentWorkspaces) => ({
@@ -1513,7 +1618,7 @@ function App() {
   }
 
   const handleSelectSession = (sessionId) => {
-    if (processing || sessionId === activeSessionId) {
+    if (sessionId === activeSessionId) {
       setSessionMenuOpen(false)
       return
     }
@@ -1542,6 +1647,9 @@ function App() {
 
     releaseSessionUrls(sessionToDelete)
     sessionGenerations.current[sessionId] = (sessionGenerations.current[sessionId] || 0) + 1
+    const requestKey = `${activeAgent}:${sessionId}`
+    pendingRoutingRequests.current.get(requestKey)?.abort()
+    pendingRoutingRequests.current.delete(requestKey)
     setAgentWorkspaces((currentWorkspaces) => {
       const workspace = currentWorkspaces[activeAgent]
       const remainingSessions = Object.fromEntries(
@@ -1580,7 +1688,9 @@ function App() {
     if ((!message.trim() && draftAttachments.length === 0) || processing) return
 
     const submissionError = getUnavailableAttachmentError(draftAttachments)
-      || getRoutingCompatibilityError(activeAgent, modelPreference, draftAttachments)
+      || (!isBackendRouting
+        ? getRoutingCompatibilityError(activeAgent, modelPreference, draftAttachments)
+        : '')
     if (submissionError) {
       setAttachmentError(submissionError)
       return
@@ -1595,56 +1705,183 @@ function App() {
     const activeGeneration = sessionGenerations.current[requestSessionId] || 0
     const isEscalation = userMessage === examples.escalation
     const isFirstMessage = messages.length === 0
+    const requestId = `request-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+    const requestKey = `${requestAgent}:${requestSessionId}`
+    const previousRouteStage = routeStage
+    const requestPrompt = userMessage || `Solicitud con archivos adjuntos: ${requestAttachments.map((attachment) => attachment.name).join(', ')}`
+    const isRequestCurrent = () => (
+      activeGeneration === (sessionGenerations.current[requestSessionId] || 0)
+    )
+    const setRequestField = (field, value) => {
+      if (isRequestCurrent()) setSessionField(requestAgent, requestSessionId, field, value)
+    }
 
-    setMessages((currentMessages) => [
+    setSessionField(requestAgent, requestSessionId, 'messages', (currentMessages) => [
       ...currentMessages,
       {
         role: 'user',
         content: userMessage,
         attachments: requestAttachments,
+        requestId,
+        pendingRouting: isBackendRouting,
       },
     ])
-    setMessage('')
-    setDraftAttachments([])
-    setAttachmentError('')
+    setSessionField(requestAgent, requestSessionId, 'draft', '')
+    setSessionField(requestAgent, requestSessionId, 'draftAttachments', [])
+    setSessionField(requestAgent, requestSessionId, 'attachmentError', '')
+    setSessionField(requestAgent, requestSessionId, 'routingError', '')
     setIsDraggingAttachments(false)
     if (isFirstMessage) {
-      setActiveSessionField('title', generateSessionTitle(userMessage || requestAttachments[0].name))
+      setSessionField(requestAgent, requestSessionId, 'title', generateSessionTitle(userMessage || requestAttachments[0].name))
     }
-    setActiveSessionField('updatedAt', Date.now())
-    setProcessing(true)
-    setRouteStage('analyzing')
+    setSessionField(requestAgent, requestSessionId, 'updatedAt', Date.now())
+    setSessionField(requestAgent, requestSessionId, 'processing', true)
+    setSessionField(requestAgent, requestSessionId, 'routeStage', 'analyzing')
     setModelMenuOpen(false)
+
+    if (isBackendRouting) {
+      const requestController = new AbortController()
+      pendingRoutingRequests.current.get(requestKey)?.abort()
+      pendingRoutingRequests.current.set(requestKey, requestController)
+
+      try {
+        const requiredCapabilities = getRequiredCapabilities(requestAttachments)
+        const decision = await requestRoutingDecision({
+          agent: requestAgent,
+          mode: isAutoMode ? 'auto' : 'manual',
+          prompt: requestPrompt,
+          input_type: getBackendInputType(requestAttachments),
+          required_capabilities: requiredCapabilities,
+          preferred_model: getBackendPreferredModelId(requestModelPreference),
+        }, { signal: requestController.signal })
+
+        if (!isRequestCurrent()) return
+
+        let selectedRoute = createBackendRoute(
+          decision,
+          requestAgent,
+          isAutoMode ? 'auto' : 'manual',
+        )
+        selectedRoute = {
+          ...selectedRoute,
+          demoTokens: estimateTokensForDemo(
+            requestPrompt,
+            selectedRoute.complexityId,
+            selectedRoute.tier,
+          ),
+        }
+
+        setRequestField('route', selectedRoute)
+        setRequestField('routeStage', 'selected')
+        await new Promise((resolve) => setTimeout(resolve, 240))
+        if (!isRequestCurrent()) return
+
+        setRequestField('routeStage', 'verifying')
+        await new Promise((resolve) => setTimeout(resolve, 240))
+        if (!isRequestCurrent()) return
+
+        const assistantResponse = `Respuesta simulada (demo; OptiRoute API solo decidió la ruta): ${getAssistantResponse(userMessage, requestAttachments)}`
+        const now = new Date()
+        const createdAt = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+        const estimatedCost = decision.estimated_cost
+        const baselineCost = decision.reference_cost
+        const savingAmount = decision.estimated_savings
+
+        setRequestField('messages', (currentMessages) => [
+          ...currentMessages.map((item) => (
+            item.requestId === requestId ? { ...item, pendingRouting: false } : item
+          )),
+          {
+            role: 'assistant',
+            content: assistantResponse,
+            agentId: requestAgent,
+          },
+        ])
+        setRequestField('route', selectedRoute)
+        setRequestField('routeStage', 'verified')
+        setRequestField('sessionStats', (currentStats) => ({
+          requests: currentStats.requests + 1,
+          optiRouteCost: currentStats.optiRouteCost + estimatedCost,
+          premiumCost: currentStats.premiumCost + baselineCost,
+          savings: currentStats.savings + savingAmount,
+        }))
+        setRequestField('history', (currentHistory) => [
+          ...currentHistory,
+          {
+            id: requestId,
+            prompt: userMessage,
+            response: assistantResponse,
+            attachments: requestAttachments,
+            model: selectedRoute.model,
+            provider: selectedRoute.provider,
+            providerName: selectedRoute.providerName,
+            mode: selectedRoute.mode,
+            modelPreference: requestModelPreference,
+            complexity: selectedRoute.complexity,
+            estimatedCost,
+            baselineCost,
+            saving: selectedRoute.saving,
+            savingAmount,
+            escalated: false,
+            initialModel: null,
+            initialProvider: null,
+            initialProviderName: null,
+            finalModel: selectedRoute.model,
+            verification: selectedRoute.verification,
+            routingSource: 'backend',
+            createdAt,
+          },
+        ])
+        setRequestField('updatedAt', Date.now())
+        setRequestField('processing', false)
+      } catch (error) {
+        if (!isRequestCurrent() || error?.kind === 'cancelled') return
+
+        setRequestField('messages', (currentMessages) => (
+          currentMessages.filter((item) => item.requestId !== requestId)
+        ))
+        setRequestField('draft', userMessage)
+        setRequestField('draftAttachments', requestAttachments)
+        setRequestField('routingError', error?.message || 'No fue posible obtener una decisión de routing.')
+        setRequestField('routeStage', route ? previousRouteStage : 'idle')
+        setRequestField('processing', false)
+      } finally {
+        if (pendingRoutingRequests.current.get(requestKey) === requestController) {
+          pendingRoutingRequests.current.delete(requestKey)
+        }
+      }
+      return
+    }
 
     await new Promise((resolve) => setTimeout(resolve, 400))
 
-    if (activeGeneration !== (sessionGenerations.current[requestSessionId] || 0)) return
+    if (!isRequestCurrent()) return
 
     const classificationPrompt = userMessage || `Analiza ${requestAttachments.map((attachment) => attachment.name).join(', ')}`
     const classification = classifyTask(classificationPrompt)
     const initialRoute = isAutoMode
       ? selectRoute(classification, requestAgent, requestAttachments)
       : selectManualRoute(classification, requestAgent, requestModelPreference, requestAttachments)
-    setRoute(initialRoute)
-    setRouteStage('selected')
+    setRequestField('route', initialRoute)
+    setRequestField('routeStage', 'selected')
 
     let selectedRoute
 
     if (isEscalation && isAutoMode) {
       await new Promise((resolve) => setTimeout(resolve, 400))
-      if (activeGeneration !== (sessionGenerations.current[requestSessionId] || 0)) return
+      if (!isRequestCurrent()) return
 
       const initialResponse = 'Cuando una sesión expira, la aplicación puede solicitar un nuevo token y continuar.'
       const initialVerificationPassed = false
 
-      setRouteStage('verifying')
+      setRequestField('routeStage', 'verifying')
       await new Promise((resolve) => setTimeout(resolve, 500))
-      if (activeGeneration !== (sessionGenerations.current[requestSessionId] || 0)) return
+      if (!isRequestCurrent()) return
 
       if (initialResponse && !initialVerificationPassed) {
-        setRouteStage('escalating')
+        setRequestField('routeStage', 'escalating')
         await new Promise((resolve) => setTimeout(resolve, 500))
-        if (activeGeneration !== (sessionGenerations.current[requestSessionId] || 0)) return
+        if (!isRequestCurrent()) return
       }
 
       selectedRoute = escalateRoute(classification, requestAgent, initialRoute)
@@ -1655,18 +1892,18 @@ function App() {
           verification: 'Sin ruta superior compatible',
         }
       }
-      setRoute(selectedRoute)
-      setRouteStage('verifying')
+      setRequestField('route', selectedRoute)
+      setRequestField('routeStage', 'verifying')
 
       await new Promise((resolve) => setTimeout(resolve, 500))
-      if (activeGeneration !== (sessionGenerations.current[requestSessionId] || 0)) return
+      if (!isRequestCurrent()) return
     } else {
       await new Promise((resolve) => setTimeout(resolve, 100))
-      if (activeGeneration !== (sessionGenerations.current[requestSessionId] || 0)) return
+      if (!isRequestCurrent()) return
 
-      setRouteStage('verifying')
+      setRequestField('routeStage', 'verifying')
       await new Promise((resolve) => setTimeout(resolve, 100))
-      if (activeGeneration !== (sessionGenerations.current[requestSessionId] || 0)) return
+      if (!isRequestCurrent()) return
 
       selectedRoute = {
         ...initialRoute,
@@ -1690,7 +1927,7 @@ function App() {
     const now = new Date()
     const createdAt = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 
-    setMessages((currentMessages) => [
+    setRequestField('messages', (currentMessages) => [
       ...currentMessages,
       {
         role: 'assistant',
@@ -1698,15 +1935,15 @@ function App() {
         agentId: requestAgent,
       },
     ])
-    setRoute(selectedRoute)
-    setRouteStage('verified')
-    setSessionStats((currentStats) => ({
+    setRequestField('route', selectedRoute)
+    setRequestField('routeStage', 'verified')
+    setRequestField('sessionStats', (currentStats) => ({
       requests: currentStats.requests + 1,
       optiRouteCost: currentStats.optiRouteCost + estimatedCost,
       premiumCost: currentStats.premiumCost + baselineCost,
       savings: currentStats.savings + baselineCost - estimatedCost,
     }))
-    setHistory((currentHistory) => [
+    setRequestField('history', (currentHistory) => [
       ...currentHistory,
       {
         id: Date.now(),
@@ -1732,8 +1969,8 @@ function App() {
         createdAt,
       },
     ])
-    setActiveSessionField('updatedAt', Date.now())
-    setProcessing(false)
+    setRequestField('updatedAt', Date.now())
+    setRequestField('processing', false)
   }
 
   useEffect(() => {
@@ -1785,7 +2022,7 @@ function App() {
             />
             <span className="text-[#A0A1A3]">OptiRoute</span>
             <span className="rounded border border-white/[0.08] bg-white/[0.03] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.08em] text-[#626467]">
-              DEMO
+              {isBackendRouting ? 'BACKEND · DEMO' : 'DEMO'}
             </span>
           </div>
 
@@ -1808,14 +2045,13 @@ function App() {
         <AgentHub
           activeAgent={activeAgent}
           onSelectAgent={(agentId) => {
-            if (processing) return
             setModelMenuOpen(false)
             setSessionMenuOpen(false)
             setHistoryOpen(false)
             setActiveAgent(agentId)
           }}
           onNewSession={handleCreateSession}
-          selectionDisabled={processing}
+          selectionDisabled={false}
         />
 
       <main key={`${activeAgent}-${activeSessionId}`} className="workspace-main workspace-switch">
@@ -1835,7 +2071,7 @@ function App() {
               sessions={agentSessions}
               activeSessionId={activeSessionId}
               open={sessionMenuOpen}
-              disabled={processing}
+              disabled={false}
               onToggle={() => setSessionMenuOpen((current) => !current)}
               onSelect={handleSelectSession}
               onCreate={handleCreateSession}
@@ -1961,6 +2197,7 @@ function App() {
               value={message}
               onChange={(event) => {
                 setMessage(event.target.value)
+                setRoutingError('')
                 resizeComposerTextarea(event.currentTarget)
               }}
               onKeyDown={(event) => {
@@ -2027,6 +2264,7 @@ function App() {
                   onChange={(value) => {
                     setModelPreference(value)
                     setAttachmentError('')
+                    setRoutingError('')
                     setModelMenuOpen(false)
                   }}
                 />
@@ -2243,11 +2481,11 @@ function App() {
 
                 <section className="route-item-reveal mt-4 grid grid-cols-2 gap-4 border-y border-white/[0.07] py-4">
                   <div>
-                    <p className="text-[9px] uppercase tracking-[0.14em] text-[#6F757D]">Costo OptiRoute</p>
+                    <p className="text-[9px] uppercase tracking-[0.14em] text-[#6F757D]">Costo estimado · demo</p>
                     <p className="mt-1 text-lg font-medium">{route.estimatedCost}</p>
                   </div>
                   <div>
-                    <p className="text-[9px] uppercase tracking-[0.14em] text-[#6F757D]">Ahorro</p>
+                    <p className="text-[9px] uppercase tracking-[0.14em] text-[#6F757D]">Ahorro estimado · demo</p>
                     <p className="mt-1 text-2xl font-medium tracking-[-0.03em]">{route.saving}</p>
                     <p className="mt-1 text-[10px] text-[#6F757D]">
                       {formatCost(parseCost(route.baselineCost) - parseCost(route.estimatedCost))} en esta solicitud
@@ -2311,9 +2549,9 @@ function App() {
                     <p className="text-[9px] uppercase tracking-[0.16em] text-[#6F757D]">Sesión</p>
                     <dl className="mt-3 space-y-2 text-xs">
                       <div className="flex items-center justify-between gap-4"><dt className="text-[#6F757D]">Solicitudes</dt><dd className="font-medium">{sessionStats.requests}</dd></div>
-                      <div className="flex items-center justify-between gap-4"><dt className="text-[#6F757D]">OptiRoute</dt><dd className="font-medium">{formatCost(sessionStats.optiRouteCost)}</dd></div>
-                      <div className="flex items-center justify-between gap-4"><dt className="text-[#6F757D]">Referencia</dt><dd className="font-medium">{formatCost(sessionStats.premiumCost)}</dd></div>
-                      <div className="flex items-center justify-between gap-4"><dt className="text-[#6F757D]">Ahorro</dt><dd className="font-medium">{formatCost(sessionStats.savings)}</dd></div>
+                      <div className="flex items-center justify-between gap-4"><dt className="text-[#6F757D]">OptiRoute · demo</dt><dd className="font-medium">{formatCost(sessionStats.optiRouteCost)}</dd></div>
+                      <div className="flex items-center justify-between gap-4"><dt className="text-[#6F757D]">Referencia · demo</dt><dd className="font-medium">{formatCost(sessionStats.premiumCost)}</dd></div>
+                      <div className="flex items-center justify-between gap-4"><dt className="text-[#6F757D]">Ahorro · demo</dt><dd className="font-medium">{formatCost(sessionStats.savings)}</dd></div>
                       <div className="flex items-center justify-between gap-4 border-t border-white/[0.06] pt-2"><dt className="text-[#6F757D]">Restante</dt><dd className="font-medium">{formatCost(remaining)}</dd></div>
                     </dl>
                   </section>
@@ -2413,21 +2651,21 @@ function App() {
                   </div>
 
                   <div>
-                    <p className="text-[10px] uppercase tracking-[0.1em] text-white/30">Costo OptiRoute</p>
+                    <p className="text-[10px] uppercase tracking-[0.1em] text-white/30">Costo estimado · demo</p>
                     <p className="mt-1.5 text-lg font-medium text-[#F3F2EE]">
                       {formatCost(sessionStats.optiRouteCost)}
                     </p>
                   </div>
 
                   <div>
-                    <p className="text-[10px] uppercase tracking-[0.1em] text-white/30">Referencia premium</p>
+                    <p className="text-[10px] uppercase tracking-[0.1em] text-white/30">Referencia estimada · demo</p>
                     <p className="mt-1.5 text-lg font-medium text-[#F3F2EE]">
                       {formatCost(sessionStats.premiumCost)}
                     </p>
                   </div>
 
                   <div>
-                    <p className="text-[10px] uppercase tracking-[0.1em] text-white/30">Ahorro acumulado</p>
+                    <p className="text-[10px] uppercase tracking-[0.1em] text-white/30">Ahorro estimado · demo</p>
                     <p className="mt-1.5 text-lg font-medium text-[#D6A24A]/90">
                       {formatCost(sessionStats.savings)}
                     </p>
@@ -2436,7 +2674,7 @@ function App() {
 
                 <div className="history-content-block history-delay-savings mt-8 border-t border-white/[0.08] pt-6">
                   <p className="text-[10px] uppercase tracking-[0.16em] text-white/35">
-                    Ahorro real
+                    Ahorro estimado · demo
                   </p>
                   <p className="mt-2 text-3xl font-medium tracking-[-0.04em] text-[#F3F2EE]">
                     {sessionStats.premiumCost === 0
@@ -2680,21 +2918,21 @@ function App() {
 
                         <div className="mt-5 grid grid-cols-3 gap-3 border-t border-white/[0.06] pt-4">
                           <div>
-                            <p className="text-[9px] uppercase tracking-[0.12em] text-white/25">Costo</p>
+                            <p className="text-[9px] uppercase tracking-[0.12em] text-white/25">Costo · demo</p>
                             <p className="mt-1.5 text-xs font-medium text-white/75">
                               {formatCost(entry.estimatedCost)}
                             </p>
                           </div>
 
                           <div>
-                            <p className="text-[9px] uppercase tracking-[0.12em] text-white/25">Referencia</p>
+                            <p className="text-[9px] uppercase tracking-[0.12em] text-white/25">Referencia · demo</p>
                             <p className="mt-1.5 text-xs font-medium text-white/75">
                               {formatCost(entry.baselineCost)}
                             </p>
                           </div>
 
                           <div>
-                            <p className="text-[9px] uppercase tracking-[0.12em] text-white/25">Ahorro</p>
+                            <p className="text-[9px] uppercase tracking-[0.12em] text-white/25">Ahorro · demo</p>
                             <p className="mt-1.5 text-xs font-medium text-[#D6A24A]/80">
                               {formatCost(entry.savingAmount)}
                             </p>

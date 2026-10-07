@@ -16,9 +16,6 @@ const quickPrompts = [
   { label: 'Diseña una arquitectura', prompt: 'Diseña una arquitectura de software escalable, identifica sus componentes, dependencias y riesgos.' },
 ]
 
-const textCapabilities = Object.freeze({ text: true, vision: false, documents: false })
-const multimodalCapabilities = Object.freeze({ text: true, vision: true, documents: true })
-
 const ATTACHMENT_STORAGE_KEY = 'optiroute-agent-workspaces-v1'
 const MAX_ATTACHMENTS = 5
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024
@@ -34,9 +31,9 @@ const providerCatalog = {
       costs: { low: 0.0032, medium: 0.012, high: 0.03 },
     },
     models: [
-      { id: 'gpt-5-6-luna', provider: 'openai', name: 'GPT 5.6 Luna', tier: 'efficient', complexity: 'low', estimatedCost: 0.0002, capabilities: textCapabilities },
-      { id: 'gpt-5-6-sol', provider: 'openai', name: 'GPT 5.6 Sol', tier: 'balanced', complexity: 'medium', estimatedCost: 0.006, capabilities: multimodalCapabilities },
-      { id: 'gpt-5-6-sol-max-demo', provider: 'openai', name: 'GPT 5.6 Sol Max (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.016, capabilities: multimodalCapabilities },
+      { id: 'gpt-5-6-luna', provider: 'openai', name: 'GPT 5.6 Luna', tier: 'efficient', complexity: 'low', estimatedCost: 0.0002, capabilities: ['text'] },
+      { id: 'gpt-5-6-sol', provider: 'openai', name: 'GPT 5.6 Sol', tier: 'balanced', complexity: 'medium', estimatedCost: 0.006, capabilities: ['text', 'vision', 'documents'] },
+      { id: 'gpt-5-6-sol-max-demo', provider: 'openai', name: 'GPT 5.6 Sol Max (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.016, capabilities: ['text', 'vision', 'documents'] },
     ],
   },
   google: {
@@ -46,9 +43,9 @@ const providerCatalog = {
       costs: { low: 0.004, medium: 0.014, high: 0.032 },
     },
     models: [
-      { id: 'gemini-flash-lite-demo', provider: 'google', name: 'Gemini Flash Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0004, capabilities: textCapabilities },
-      { id: 'gemini-2-5-flash-demo', provider: 'google', name: 'Gemini 2.5 Flash (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.004, capabilities: multimodalCapabilities },
-      { id: 'gemini-2-5-pro', provider: 'google', name: 'Gemini 2.5 Pro', tier: 'premium', complexity: 'high', estimatedCost: 0.012, capabilities: multimodalCapabilities },
+      { id: 'gemini-flash-lite-demo', provider: 'google', name: 'Gemini Flash Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0004, capabilities: ['text', 'vision'] },
+      { id: 'gemini-2-5-flash-demo', provider: 'google', name: 'Gemini 2.5 Flash (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.004, capabilities: ['text', 'vision', 'documents'] },
+      { id: 'gemini-2-5-pro', provider: 'google', name: 'Gemini 2.5 Pro', tier: 'premium', complexity: 'high', estimatedCost: 0.012, capabilities: ['text', 'vision', 'documents'] },
     ],
   },
   anthropic: {
@@ -58,9 +55,9 @@ const providerCatalog = {
       costs: { low: 0.0042, medium: 0.012, high: 0.031 },
     },
     models: [
-      { id: 'claude-haiku-eco-demo', provider: 'anthropic', name: 'Claude Haiku Eco (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0006, capabilities: textCapabilities },
-      { id: 'claude-haiku-4-5', provider: 'anthropic', name: 'Claude Haiku 4.5', tier: 'balanced', complexity: 'medium', estimatedCost: 0.003, capabilities: multimodalCapabilities },
-      { id: 'claude-sonnet-route-demo', provider: 'anthropic', name: 'Claude Sonnet Route (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.014, capabilities: multimodalCapabilities },
+      { id: 'claude-haiku-eco-demo', provider: 'anthropic', name: 'Claude Haiku Eco (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0006, capabilities: ['text'] },
+      { id: 'claude-haiku-4-5', provider: 'anthropic', name: 'Claude Haiku 4.5', tier: 'balanced', complexity: 'medium', estimatedCost: 0.003, capabilities: ['text', 'documents'] },
+      { id: 'claude-sonnet-route-demo', provider: 'anthropic', name: 'Claude Sonnet Route (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.014, capabilities: ['text', 'vision', 'documents'] },
     ],
   },
   meta: {
@@ -70,9 +67,9 @@ const providerCatalog = {
       costs: { low: 0.0018, medium: 0.006, high: 0.018 },
     },
     models: [
-      { id: 'meta-route-lite-demo', provider: 'meta', name: 'Meta Route Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0001, capabilities: textCapabilities },
-      { id: 'meta-route-core-demo', provider: 'meta', name: 'Meta Route Core (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.0018, capabilities: multimodalCapabilities },
-      { id: 'meta-route-pro-demo', provider: 'meta', name: 'Meta Route Pro (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.0065, capabilities: multimodalCapabilities },
+      { id: 'meta-route-lite-demo', provider: 'meta', name: 'Meta Route Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0001, capabilities: ['text'] },
+      { id: 'meta-route-core-demo', provider: 'meta', name: 'Meta Route Core (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.0018, capabilities: ['text'] },
+      { id: 'meta-route-pro-demo', provider: 'meta', name: 'Meta Route Pro (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.0065, capabilities: ['text', 'vision'] },
     ],
   },
   deepseek: {
@@ -82,9 +79,9 @@ const providerCatalog = {
       costs: { low: 0.0015, medium: 0.005, high: 0.016 },
     },
     models: [
-      { id: 'deepseek-route-lite-demo', provider: 'deepseek', name: 'DeepSeek Route Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0001, capabilities: textCapabilities },
-      { id: 'deepseek-route-core-demo', provider: 'deepseek', name: 'DeepSeek Route Core (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.0015, capabilities: multimodalCapabilities },
-      { id: 'deepseek-route-pro-demo', provider: 'deepseek', name: 'DeepSeek Route Pro (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.0055, capabilities: multimodalCapabilities },
+      { id: 'deepseek-route-lite-demo', provider: 'deepseek', name: 'DeepSeek Route Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0001, capabilities: ['text'] },
+      { id: 'deepseek-route-core-demo', provider: 'deepseek', name: 'DeepSeek Route Core (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.0015, capabilities: ['text', 'documents'] },
+      { id: 'deepseek-route-pro-demo', provider: 'deepseek', name: 'DeepSeek Route Pro (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.0055, capabilities: ['text', 'documents'] },
     ],
   },
   kimi: {
@@ -94,9 +91,9 @@ const providerCatalog = {
       costs: { low: 0.002, medium: 0.007, high: 0.02 },
     },
     models: [
-      { id: 'kimi-route-lite-demo', provider: 'kimi', name: 'Kimi Route Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0002, capabilities: textCapabilities },
-      { id: 'kimi-route-core-demo', provider: 'kimi', name: 'Kimi Route Core (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.0022, capabilities: multimodalCapabilities },
-      { id: 'kimi-route-pro-demo', provider: 'kimi', name: 'Kimi Route Pro (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.0075, capabilities: multimodalCapabilities },
+      { id: 'kimi-route-lite-demo', provider: 'kimi', name: 'Kimi Route Lite (Demo)', tier: 'efficient', complexity: 'low', estimatedCost: 0.0002, capabilities: ['text'] },
+      { id: 'kimi-route-core-demo', provider: 'kimi', name: 'Kimi Route Core (Demo)', tier: 'balanced', complexity: 'medium', estimatedCost: 0.0022, capabilities: ['text', 'documents'] },
+      { id: 'kimi-route-pro-demo', provider: 'kimi', name: 'Kimi Route Pro (Demo)', tier: 'premium', complexity: 'high', estimatedCost: 0.0075, capabilities: ['text', 'vision', 'documents'] },
     ],
   },
 }
@@ -131,36 +128,82 @@ function getAvailableModels(activeAgent) {
   return providerCatalog[activeAgent]?.models || []
 }
 
+const capabilityLabels = {
+  text: 'texto',
+  vision: 'visión',
+  documents: 'documentos',
+}
+
+function getRequiredCapabilities(attachments = []) {
+  const requiredCapabilities = ['text']
+  if (attachments.some((attachment) => attachment.category === 'image')) requiredCapabilities.push('vision')
+  if (attachments.some((attachment) => attachment.category !== 'image')) requiredCapabilities.push('documents')
+  return requiredCapabilities
+}
+
 function getAttachmentRequirements(attachments = []) {
+  const capabilities = getRequiredCapabilities(attachments)
   return {
-    vision: attachments.some((attachment) => attachment.category === 'image'),
-    documents: attachments.some((attachment) => attachment.category !== 'image'),
+    capabilities,
+    vision: capabilities.includes('vision'),
+    documents: capabilities.includes('documents'),
   }
-}
-
-function isModelCompatible(model, attachments = []) {
-  const requirements = getAttachmentRequirements(attachments)
-  return (!requirements.vision || model.capabilities.vision) &&
-    (!requirements.documents || model.capabilities.documents)
-}
-
-function getModelIncompatibility(model, attachments = []) {
-  const requirements = getAttachmentRequirements(attachments)
-  const missingVision = requirements.vision && !model.capabilities.vision
-  const missingDocuments = requirements.documents && !model.capabilities.documents
-
-  if (missingVision && missingDocuments) return 'No compatible con imágenes ni documentos'
-  if (missingVision) return 'No compatible con imágenes'
-  if (missingDocuments) return 'No compatible con documentos'
-  return ''
 }
 
 function getAttachmentInputLabel(attachments = []) {
   const requirements = getAttachmentRequirements(attachments)
   if (requirements.vision && requirements.documents) return 'Multimodal'
-  if (requirements.vision) return 'Texto + imagen'
-  if (requirements.documents) return 'Texto + documento'
+  if (requirements.vision) return 'Imagen'
+  if (requirements.documents) return 'Documento'
   return 'Texto'
+}
+
+function getModelCompatibility(model, requiredCapabilities) {
+  const missingCapabilities = requiredCapabilities.filter(
+    (capability) => !model.capabilities.includes(capability),
+  )
+
+  return {
+    compatible: missingCapabilities.length === 0,
+    missingCapabilities,
+  }
+}
+
+function filterModelsByCapabilities(models, requiredCapabilities) {
+  return models.filter((model) => getModelCompatibility(model, requiredCapabilities).compatible)
+}
+
+function getCapabilityListLabel(capabilities) {
+  return capabilities.map((capability) => capabilityLabels[capability]).join(' y ')
+}
+
+function getUnavailableAttachmentError(attachments = []) {
+  return attachments.some((attachment) => attachment.available === false)
+    ? 'Uno o más archivos ya no están disponibles después de recargar. Vuelve a adjuntarlos antes de enviar.'
+    : ''
+}
+
+function getRoutingCompatibilityError(activeAgent, modelPreference, attachments = []) {
+  const requiredCapabilities = getRequiredCapabilities(attachments)
+  const availableModels = getAvailableModels(activeAgent)
+
+  if (modelPreference !== 'auto') {
+    const selectedModel = availableModels.find((model) => model.id === modelPreference)
+    if (!selectedModel) return 'El modelo seleccionado no está disponible en el agente activo.'
+
+    const compatibility = getModelCompatibility(selectedModel, requiredCapabilities)
+    if (!compatibility.compatible) {
+      return `${selectedModel.name} no admite ${getCapabilityListLabel(compatibility.missingCapabilities)}. Selecciona un modelo compatible o vuelve a OptiRoute Auto.`
+    }
+  }
+
+  const compatibleModels = filterModelsByCapabilities(availableModels, requiredCapabilities)
+  if (compatibleModels.length === 0) {
+    const context = activeAgent === 'global' ? 'el catálogo disponible' : providerCatalog[activeAgent].name
+    return `No hay modelos compatibles con ${getCapabilityListLabel(requiredCapabilities.slice(1))} en ${context}.`
+  }
+
+  return ''
 }
 
 function getModelById(modelId) {
@@ -185,13 +228,8 @@ function formatSaving(estimatedCost, baselineCost, escalated = false) {
   return escalated ? `${percentage.toFixed(1)}%` : `${Math.round(percentage)}%`
 }
 
-function estimateTokensForDemo(prompt, complexity, tier, attachments = []) {
-  const attachmentTokens = attachments.reduce((total, attachment) => {
-    if (attachment.category === 'image') return total + 1200
-    const sizeEstimate = Math.ceil(attachment.size / 1024) * 2
-    return total + Math.min(Math.max(sizeEstimate, 400), 6000)
-  }, 0)
-  const promptTokens = Math.max(80, Math.ceil(prompt.length / 4)) + attachmentTokens
+function estimateTokensForDemo(prompt, complexity, tier) {
+  const promptTokens = Math.max(80, Math.ceil(prompt.length / 4))
   const complexityMultiplier = { low: 4, medium: 9, high: 18 }[complexity] || 4
   const tierRatio = { efficient: 0.58, balanced: 0.72, premium: 0.86 }[tier] || 0.72
   const premium = Math.max(500, Math.round((promptTokens * complexityMultiplier + 700) / 100) * 100)
@@ -218,8 +256,6 @@ function createRoute(model, classification, activeAgent, options = {}) {
   const restricted = activeAgent !== 'global'
   const escalated = options.escalated === true
   const mode = options.mode || 'auto'
-  const attachments = options.attachments || []
-  const inputType = getAttachmentInputLabel(attachments)
 
   let reason
 
@@ -230,15 +266,9 @@ function createRoute(model, classification, activeAgent, options = {}) {
       ? `La verificación inicial no fue superada. OptiRoute escaló dentro de ${provider.name} sin salir del proveedor permitido.`
       : `La verificación inicial no fue superada. OptiRoute escaló de ${options.initialProviderName} a ${provider.name} para aumentar la capacidad de la ruta.`
   } else {
-    if (attachments.length > 0) {
-      reason = restricted
-        ? `El contexto está restringido a ${provider.name}. OptiRoute seleccionó una opción compatible con la entrada adjunta y eficiente para esta complejidad.`
-        : `OptiRoute seleccionó ${provider.name} y ${model.name} por ser compatible con la entrada adjunta y ofrecer capacidad suficiente con menor costo estimado.`
-    } else {
-      reason = restricted
-        ? `El contexto está restringido a ${provider.name}. OptiRoute seleccionó la opción más eficiente disponible para esta complejidad.`
-        : `OptiRoute seleccionó ${provider.name} y ${model.name} por ofrecer capacidad suficiente para la tarea con un costo inferior a la referencia premium.`
-    }
+    reason = restricted
+      ? `El contexto está restringido a ${provider.name}. OptiRoute seleccionó la opción más eficiente disponible para esta complejidad.`
+      : `OptiRoute seleccionó ${provider.name} y ${model.name} por ofrecer capacidad suficiente para la tarea con un costo inferior a la referencia premium.`
   }
 
   return {
@@ -246,16 +276,15 @@ function createRoute(model, classification, activeAgent, options = {}) {
     providerName: provider.name,
     contextAgent: activeAgent,
     mode,
-    inputType,
-    inputAttachments: attachments.map(serializeAttachment),
     model: model.name,
     modelId: model.id,
-    modelComplexity: model.complexity,
     tier: model.tier,
     complexity: complexityLabels[classification.complexity],
     complexityId: classification.complexity,
     taskType: classification.type,
     intent: classification.intent,
+    inputType: options.inputType || 'Texto',
+    requiredCapabilities: options.requiredCapabilities || ['text'],
     estimatedCost: formatCost(estimatedCost),
     baselineCost: formatCost(reference.cost),
     baselineModel: reference.model,
@@ -270,50 +299,71 @@ function createRoute(model, classification, activeAgent, options = {}) {
   }
 }
 
+function selectBestModel(models, classification, preferredModelId) {
+  const preferredModel = preferredModelId
+    ? models.find((model) => model.id === preferredModelId)
+    : null
+  if (preferredModel) return preferredModel
+
+  const targetComplexityIndex = complexityOrder.indexOf(classification.complexity)
+  return [...models].sort((first, second) => {
+    const firstDistance = Math.abs(complexityOrder.indexOf(first.complexity) - targetComplexityIndex)
+    const secondDistance = Math.abs(complexityOrder.indexOf(second.complexity) - targetComplexityIndex)
+    return firstDistance - secondDistance || first.estimatedCost - second.estimatedCost
+  })[0] || null
+}
+
 function selectManualRoute(classification, activeAgent, modelId, attachments = []) {
   const allowedModel = getAvailableModels(activeAgent).find((model) => model.id === modelId)
-  return allowedModel && isModelCompatible(allowedModel, attachments)
-    ? createRoute(allowedModel, classification, activeAgent, { mode: 'manual', attachments })
-    : null
+  if (!allowedModel) return null
+
+  const requiredCapabilities = getRequiredCapabilities(attachments)
+  if (!getModelCompatibility(allowedModel, requiredCapabilities).compatible) return null
+
+  return createRoute(allowedModel, classification, activeAgent, {
+    mode: 'manual',
+    inputType: getAttachmentInputLabel(attachments),
+    requiredCapabilities,
+  })
 }
 
 function selectRoute(classification, activeAgent, attachments = []) {
-  const availableModels = getAvailableModels(activeAgent).filter((model) => isModelCompatible(model, attachments))
-  const exactModels = availableModels
-    .filter((model) => model.complexity === classification.complexity)
-    .sort((first, second) => first.estimatedCost - second.estimatedCost)
-  const higherModels = availableModels
-    .filter((model) => complexityOrder.indexOf(model.complexity) > complexityOrder.indexOf(classification.complexity))
-    .sort((first, second) => (
-      complexityOrder.indexOf(first.complexity) - complexityOrder.indexOf(second.complexity) ||
-      first.estimatedCost - second.estimatedCost
-    ))
-  const preferredModel = activeAgent === 'global' && attachments.length === 0
-    ? getModelById(globalRoutePreferences[classification.complexity])
-    : exactModels[0] || higherModels[0] || availableModels[availableModels.length - 1]
+  const requiredCapabilities = getRequiredCapabilities(attachments)
+  const compatibleModels = filterModelsByCapabilities(
+    getAvailableModels(activeAgent),
+    requiredCapabilities,
+  )
+  const preferredModelId = activeAgent === 'global'
+    ? globalRoutePreferences[classification.complexity]
+    : null
+  const selectedModel = selectBestModel(compatibleModels, classification, preferredModelId)
+  if (!selectedModel) return null
 
-  return createRoute(preferredModel, classification, activeAgent, { attachments })
+  return createRoute(selectedModel, classification, activeAgent, {
+    inputType: getAttachmentInputLabel(attachments),
+    requiredCapabilities,
+  })
 }
 
-function escalateRoute(classification, activeAgent, initialRoute, attachments = []) {
-  const currentComplexity = complexityOrder[
-    Math.max(
-      complexityOrder.indexOf(classification.complexity),
-      complexityOrder.indexOf(initialRoute.modelComplexity || classification.complexity),
-    )
-  ]
+function escalateRoute(classification, activeAgent, initialRoute) {
   const nextComplexityIndex = Math.min(
-    complexityOrder.indexOf(currentComplexity) + 1,
+    complexityOrder.indexOf(classification.complexity) + 1,
     complexityOrder.length - 1,
   )
   const nextComplexity = complexityOrder[nextComplexityIndex]
-  const availableModels = getAvailableModels(activeAgent).filter((model) => isModelCompatible(model, attachments))
-  const escalatedModel = activeAgent === 'global' && attachments.length === 0
-    ? getModelById(globalRoutePreferences[nextComplexity])
-    : availableModels
-      .filter((model) => model.complexity === nextComplexity)
-      .sort((first, second) => first.estimatedCost - second.estimatedCost)[0] ||
-      availableModels[availableModels.length - 1]
+  const requiredCapabilities = initialRoute.requiredCapabilities || ['text']
+  const compatibleModels = filterModelsByCapabilities(
+    getAvailableModels(activeAgent),
+    requiredCapabilities,
+  )
+  const escalationCandidates = compatibleModels.filter((model) => model.id !== initialRoute.modelId)
+  const preferredModelId = activeAgent === 'global' ? globalRoutePreferences[nextComplexity] : null
+  const escalatedModel = selectBestModel(
+    escalationCandidates.filter((model) => model.complexity === nextComplexity),
+    { ...classification, complexity: nextComplexity },
+    preferredModelId,
+  ) || selectBestModel(escalationCandidates, { ...classification, complexity: nextComplexity })
+  if (!escalatedModel) return null
   const combinedCost = parseCost(initialRoute.estimatedCost) + escalatedModel.estimatedCost
 
   return createRoute(
@@ -328,7 +378,8 @@ function escalateRoute(classification, activeAgent, initialRoute, attachments = 
       initialProvider: initialRoute.provider,
       initialProviderName: initialRoute.providerName,
       initialCost: initialRoute.estimatedCost,
-      attachments,
+      inputType: initialRoute.inputType,
+      requiredCapabilities,
     },
   )
 }
@@ -607,15 +658,15 @@ function getAssistantResponse(userMessage, attachments = []) {
   const requirements = getAttachmentRequirements(attachments)
 
   if (requirements.vision && requirements.documents) {
-    return 'OptiRoute detectó una entrada multimodal y seleccionó una ruta compatible con visión y documentos. El análisis real del contenido estará disponible al conectar el procesamiento backend.'
+    return 'OptiRoute detectó imágenes y documentos adjuntos. El procesamiento real del contenido estará disponible al conectar el backend y un modelo multimodal.'
   }
 
   if (requirements.vision) {
-    return 'OptiRoute detectó una entrada visual y seleccionó una ruta compatible con visión. El análisis real del contenido estará disponible al conectar el procesamiento backend.'
+    return 'OptiRoute detectó una entrada visual. El análisis real estará disponible al conectar un modelo multimodal.'
   }
 
   if (requirements.documents) {
-    return 'OptiRoute detectó un documento adjunto y seleccionó una ruta compatible. El análisis real del contenido estará disponible al conectar el procesamiento backend.'
+    return 'OptiRoute detectó un documento adjunto. El procesamiento real del contenido estará disponible al conectar el backend.'
   }
 
   const normalizedMessage = userMessage
@@ -1016,7 +1067,7 @@ function AttachmentPreview({ attachment, removable = false, disabled = false, on
           <span className="attachment-preview__name">{attachment.name}</span>
           <span className="attachment-preview__size">{formatFileSize(attachment.size)}</span>
           {attachment.available === false && (
-            <span className="attachment-preview__unavailable">Archivo local no disponible tras recargar</span>
+            <span className="attachment-preview__unavailable">Archivo local no disponible después de recargar</span>
           )}
         </span>
       )}
@@ -1038,6 +1089,11 @@ function AttachmentPreview({ attachment, removable = false, disabled = false, on
 
 function ModelPicker({ activeAgent, value, open, onToggle, onChange, disabled, attachments }) {
   const selectedModel = value === 'auto' ? null : getModelById(value)
+  const requiredCapabilities = getRequiredCapabilities(attachments)
+  const hasCompatibleAutoRoute = filterModelsByCapabilities(
+    getAvailableModels(activeAgent),
+    requiredCapabilities,
+  ).length > 0
   const providers = activeAgent === 'global'
     ? Object.entries(providerCatalog)
     : [[activeAgent, providerCatalog[activeAgent]]]
@@ -1074,8 +1130,9 @@ function ModelPicker({ activeAgent, value, open, onToggle, onChange, disabled, a
             type="button"
             role="option"
             aria-selected={value === 'auto'}
+            disabled={!hasCompatibleAutoRoute}
             onClick={() => onChange('auto')}
-            className={`w-full rounded-lg border px-3 py-3 text-left transition-colors duration-150 ${
+            className={`w-full rounded-lg border px-3 py-3 text-left transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 ${
               value === 'auto'
                 ? 'border-[#D6A24A]/20 bg-[#D6A24A]/[0.06]'
                 : 'border-transparent hover:bg-white/[0.035]'
@@ -1093,7 +1150,7 @@ function ModelPicker({ activeAgent, value, open, onToggle, onChange, disabled, a
               <p className="px-3 text-[8px] uppercase tracking-[0.18em] text-white/25">{provider.name}</p>
               <div className="mt-1 space-y-0.5">
                 {provider.models.map((model) => {
-                  const incompatibility = getModelIncompatibility(model, attachments)
+                  const compatibility = getModelCompatibility(model, requiredCapabilities)
 
                   return (
                     <button
@@ -1101,17 +1158,18 @@ function ModelPicker({ activeAgent, value, open, onToggle, onChange, disabled, a
                       type="button"
                       role="option"
                       aria-selected={value === model.id}
-                      disabled={disabled || Boolean(incompatibility)}
+                      disabled={!compatibility.compatible}
                       onClick={() => onChange(model.id)}
-                      className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 ${
-                        value === model.id ? 'bg-white/[0.06] text-[#F3F2EE]' : 'text-[#A1A6AE] hover:bg-white/[0.035] hover:text-[#E5E6E3]'
+                      className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-35 ${
+                        value === model.id ? 'bg-white/[0.06] text-[#F3F2EE]' : 'text-[#A1A6AE] hover:bg-white/[0.035] hover:text-[#E5E6E3] disabled:hover:bg-transparent disabled:hover:text-[#A1A6AE]'
                       }`}
                     >
-                      <span className="min-w-0">
-                        <span className="block truncate text-[11px]">{model.name}</span>
-                        {incompatibility && <span className="mt-0.5 block text-[8px] text-[#D6A24A]/55">{incompatibility}</span>}
+                      <span className="truncate text-[11px]">{model.name}</span>
+                      <span className="shrink-0 text-right text-[8px] uppercase tracking-[0.12em] text-white/25">
+                        {compatibility.compatible
+                          ? complexityLabels[model.complexity]
+                          : `Sin ${getCapabilityListLabel(compatibility.missingCapabilities)}`}
                       </span>
-                      <span className="shrink-0 text-[8px] uppercase tracking-[0.12em] text-white/25">{complexityLabels[model.complexity]}</span>
                     </button>
                   )
                 })}
@@ -1189,6 +1247,44 @@ function ImpactPanel({ route, routeStage, sessionStats, budget }) {
   )
 }
 
+function DynamicChatHero({ visible, activeAgent, selectedAgent }) {
+  return (
+    <div
+      className={`chat-hero ${visible ? 'chat-hero--visible' : 'chat-hero--hidden'}`}
+      aria-hidden={!visible}
+    >
+      <div className="chat-hero__content">
+        <div className="chat-hero__intro mb-3 flex items-end">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-[#626467]">
+            Nueva conversación
+          </p>
+        </div>
+
+        <h1 className="text-3xl font-medium tracking-[-0.03em] text-[#F4F4F2]">
+          Hola, ¿qué quieres resolver?
+        </h1>
+
+        <div className="mt-4 hidden items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-[#626467] md:flex">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#D9A441]" />
+          <span>Sistema activo</span>
+          <span className="h-px w-12 bg-white/[0.08]" />
+        </div>
+
+        <div className="mt-7">
+          <p className="text-[10px] uppercase tracking-[0.18em] text-[#6F757D]">
+            Routing workspace
+          </p>
+          <p className="mt-2 text-[11px] text-[#6F757D]">
+            {activeAgent === 'global'
+              ? 'Escribe una tarea y OptiRoute seleccionará la ruta de IA más eficiente.'
+              : `Escribe una tarea y OptiRoute seleccionará la ruta más eficiente dentro de ${selectedAgent.name}.`}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const [activeAgent, setActiveAgent] = useState('global')
   const [agentWorkspaces, setAgentWorkspaces] = useState(loadAgentWorkspaces)
@@ -1199,6 +1295,7 @@ function App() {
   const sessionGenerations = useRef({})
   const messagesContainerRef = useRef(null)
   const fileInputRef = useRef(null)
+  const textareaRef = useRef(null)
   const objectUrlsRef = useRef(new Set())
   const activeAgentWorkspace = agentWorkspaces[activeAgent]
   const activeSessionId = activeAgentWorkspace.activeSessionId
@@ -1258,19 +1355,23 @@ function App() {
   const setBudgetEditing = (value) => setActiveSessionField('budgetEditing', value)
   const setBudgetDraft = (value) => setActiveSessionField('budgetDraft', value)
   const selectedAgent = agents.find((agent) => agent.id === activeAgent) || agents[0]
-  const selectedPreferenceModel = modelPreference === 'auto' ? null : getModelById(modelPreference)
-  const selectedModelIncompatibility = selectedPreferenceModel
-    ? getModelIncompatibility(selectedPreferenceModel, draftAttachments)
-    : ''
-  const visibleAttachmentError = attachmentError || (selectedModelIncompatibility
-    ? 'El modelo seleccionado no admite este tipo de archivo. Selecciona otro modelo o vuelve a OptiRoute Auto.'
-    : '')
+  const showHero = messages.length === 0
+  const unavailableAttachmentError = getUnavailableAttachmentError(draftAttachments)
+  const routingCompatibilityError = getRoutingCompatibilityError(
+    activeAgent,
+    modelPreference,
+    draftAttachments,
+  )
+  const visibleAttachmentError = attachmentError || unavailableAttachmentError || routingCompatibilityError
+  const latestUserMessage = [...messages].reverse().find((item) => item.role === 'user')
+  const detectedInputType = draftAttachments.length > 0
+    ? getAttachmentInputLabel(draftAttachments)
+    : route?.inputType || getAttachmentInputLabel(latestUserMessage?.attachments || [])
   const escalationPreview = route && routeStage === 'escalating'
     ? escalateRoute(
       { type: route.taskType, complexity: route.complexityId, intent: route.intent },
       route.contextAgent,
       route,
-      route.inputAttachments || [],
     )
     : null
 
@@ -1280,6 +1381,16 @@ function App() {
   const safeUsagePercentage = Math.min(usagePercentage, 100)
   const isNearBudget = usagePercentage >= 80 && usagePercentage < 100
   const isOverBudget = usagePercentage >= 100
+
+  const resizeComposerTextarea = (textarea = textareaRef.current) => {
+    if (!textarea) return
+
+    textarea.style.height = 'auto'
+    const maxHeight = Number.parseFloat(window.getComputedStyle(textarea).maxHeight) || 210
+    const nextHeight = Math.min(textarea.scrollHeight, maxHeight)
+    textarea.style.height = `${nextHeight}px`
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
+  }
 
   useEffect(() => {
     try {
@@ -1305,6 +1416,10 @@ function App() {
     }
   }, [activeAgent, activeSessionId, messages, processing, routeStage])
 
+  useEffect(() => {
+    resizeComposerTextarea()
+  }, [activeSessionId, message])
+
   const saveBudget = () => {
     const newBudget = Number(budgetDraft)
 
@@ -1318,12 +1433,6 @@ function App() {
   const cancelBudgetEditing = () => {
     setBudgetDraft(budget.toFixed(4))
     setBudgetEditing(false)
-  }
-
-  const getManualCompatibilityError = (attachments) => {
-    if (modelPreference === 'auto') return ''
-    const selectedModel = getModelById(modelPreference)
-    return selectedModel ? getModelIncompatibility(selectedModel, attachments) : ''
   }
 
   const releaseAttachmentUrl = (attachment) => {
@@ -1367,12 +1476,9 @@ function App() {
       if (attachment.previewUrl) objectUrlsRef.current.add(attachment.previewUrl)
     })
     const nextAttachments = [...draftAttachments, ...newAttachments]
-    const compatibilityError = getManualCompatibilityError(nextAttachments)
 
     setDraftAttachments(nextAttachments)
-    setAttachmentError(compatibilityError
-      ? 'El modelo seleccionado no admite este tipo de archivo. Selecciona otro modelo o vuelve a OptiRoute Auto.'
-      : nextError)
+    setAttachmentError(nextError)
   }
 
   const removeAttachment = (attachmentId) => {
@@ -1382,11 +1488,8 @@ function App() {
     if (attachment) releaseAttachmentUrl(attachment)
 
     const nextAttachments = draftAttachments.filter((item) => item.id !== attachmentId)
-    const compatibilityError = getManualCompatibilityError(nextAttachments)
     setDraftAttachments(nextAttachments)
-    setAttachmentError(compatibilityError
-      ? 'El modelo seleccionado no admite este tipo de archivo. Selecciona otro modelo o vuelve a OptiRoute Auto.'
-      : '')
+    setAttachmentError('')
   }
 
   const handleCreateSession = () => {
@@ -1476,9 +1579,10 @@ function App() {
   const sendMessage = async () => {
     if ((!message.trim() && draftAttachments.length === 0) || processing) return
 
-    const manualCompatibilityError = getManualCompatibilityError(draftAttachments)
-    if (manualCompatibilityError) {
-      setAttachmentError('El modelo seleccionado no admite este tipo de archivo. Selecciona otro modelo o vuelve a OptiRoute Auto.')
+    const submissionError = getUnavailableAttachmentError(draftAttachments)
+      || getRoutingCompatibilityError(activeAgent, modelPreference, draftAttachments)
+    if (submissionError) {
+      setAttachmentError(submissionError)
       return
     }
 
@@ -1543,7 +1647,14 @@ function App() {
         if (activeGeneration !== (sessionGenerations.current[requestSessionId] || 0)) return
       }
 
-      selectedRoute = escalateRoute(classification, requestAgent, initialRoute, requestAttachments)
+      selectedRoute = escalateRoute(classification, requestAgent, initialRoute)
+      if (!selectedRoute) {
+        selectedRoute = {
+          ...initialRoute,
+          escalated: false,
+          verification: 'Sin ruta superior compatible',
+        }
+      }
       setRoute(selectedRoute)
       setRouteStage('verifying')
 
@@ -1570,7 +1681,6 @@ function App() {
         userMessage,
         selectedRoute.complexityId,
         selectedRoute.tier,
-        requestAttachments,
       ),
     }
 
@@ -1718,54 +1828,35 @@ function App() {
             <span className="relative h-2 w-2 rounded-full border border-white/10 bg-[#17181A]" />
           </div>
 
-          <div className="chat-heading-glow relative isolate shrink-0">
-            <div className="mb-3 flex items-end justify-between gap-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-[#626467]">
-                Nueva conversación
-              </p>
-              <SessionSwitcher
-                key={activeAgent}
-                agent={selectedAgent}
-                sessions={agentSessions}
-                activeSessionId={activeSessionId}
-                open={sessionMenuOpen}
-                disabled={processing}
-                onToggle={() => setSessionMenuOpen((current) => !current)}
-                onSelect={handleSelectSession}
-                onCreate={handleCreateSession}
-                onDelete={handleDeleteSession}
+          <div className="chat-context-header shrink-0">
+            <SessionSwitcher
+              key={activeAgent}
+              agent={selectedAgent}
+              sessions={agentSessions}
+              activeSessionId={activeSessionId}
+              open={sessionMenuOpen}
+              disabled={processing}
+              onToggle={() => setSessionMenuOpen((current) => !current)}
+              onSelect={handleSelectSession}
+              onCreate={handleCreateSession}
+              onDelete={handleDeleteSession}
+            />
+          </div>
+
+          <div className="chat-conversation-area min-h-0 flex-1">
+            <div className="chat-heading-glow relative isolate shrink-0">
+              <DynamicChatHero
+                visible={showHero}
+                activeAgent={activeAgent}
+                selectedAgent={selectedAgent}
               />
             </div>
 
-            <h1 className="text-3xl font-medium tracking-[-0.03em] text-[#F4F4F2]">
-              Hola, ¿qué quieres resolver?
-            </h1>
-
-            <div className="mt-4 hidden items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-[#626467] md:flex">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#D9A441]" />
-              <span>Sistema activo</span>
-              <span className="h-px w-12 bg-white/[0.08]" />
-            </div>
-
-            {messages.length === 0 && (
-              <div className="mt-7">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-[#6F757D]">
-                  Routing workspace
-                </p>
-                <p className="mt-2 text-[11px] text-[#6F757D]">
-                  {activeAgent === 'global'
-                    ? 'Escribe una tarea y OptiRoute seleccionará la ruta de IA más eficiente.'
-                    : `Escribe una tarea y OptiRoute seleccionará la ruta más eficiente dentro de ${selectedAgent.name}.`}
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div
-            ref={messagesContainerRef}
-            className="chat-message-stream mt-10 min-h-0 flex-1 overflow-y-auto pr-2"
-          >
-            <div className="conversation-turns w-full pb-8">
+            <div
+              ref={messagesContainerRef}
+              className="chat-message-stream min-h-0 flex-1 overflow-y-auto pr-2"
+            >
+              <div className="conversation-turns w-full pb-8">
               {messages.map((item, index) => (
                 item.role === 'user' ? (
                   <div key={index} className="message-enter user-message-row">
@@ -1835,6 +1926,7 @@ function App() {
                   </div>
                 </div>
               )}
+              </div>
             </div>
           </div>
 
@@ -1864,9 +1956,13 @@ function App() {
             )}
 
             <textarea
-              rows="3"
+              ref={textareaRef}
+              rows="1"
               value={message}
-              onChange={(event) => setMessage(event.target.value)}
+              onChange={(event) => {
+                setMessage(event.target.value)
+                resizeComposerTextarea(event.currentTarget)
+              }}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
                   event.preventDefault()
@@ -1874,7 +1970,7 @@ function App() {
                 }
               }}
               placeholder="Escribe una tarea para OptiRoute..."
-              className="h-[112px] w-full resize-none overflow-x-hidden bg-transparent p-3 text-[15px] text-[#F4F4F2] outline-none placeholder:text-[#626467]"
+              className="composer-textarea w-full resize-none overflow-x-hidden bg-transparent px-1 py-0 text-[15px] text-[#F4F4F2] outline-none placeholder:text-[#626467]"
             />
 
             {draftAttachments.length > 0 && (
@@ -1895,7 +1991,7 @@ function App() {
               <p className="attachment-error" role="status">{visibleAttachmentError}</p>
             )}
 
-            <div className="flex items-end justify-between gap-3">
+            <div className="composer-toolbar flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
                 <input
                   ref={fileInputRef}
@@ -1924,19 +2020,13 @@ function App() {
                 <ModelPicker
                   activeAgent={activeAgent}
                   value={modelPreference}
+                  attachments={draftAttachments}
                   open={modelMenuOpen}
                   disabled={processing}
-                  attachments={draftAttachments}
                   onToggle={() => setModelMenuOpen((current) => !current)}
                   onChange={(value) => {
-                    const selectedModel = value === 'auto' ? null : getModelById(value)
-                    const incompatibility = selectedModel
-                      ? getModelIncompatibility(selectedModel, draftAttachments)
-                      : ''
                     setModelPreference(value)
-                    setAttachmentError(incompatibility
-                      ? 'El modelo seleccionado no admite este tipo de archivo. Selecciona otro modelo o vuelve a OptiRoute Auto.'
-                      : '')
+                    setAttachmentError('')
                     setModelMenuOpen(false)
                   }}
                 />
@@ -1945,7 +2035,7 @@ function App() {
               <button
                 type="button"
                 onClick={sendMessage}
-                disabled={processing}
+                disabled={processing || Boolean(unavailableAttachmentError || routingCompatibilityError) || (!message.trim() && draftAttachments.length === 0)}
                 aria-label="Enviar mensaje"
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-[#F1F1ED] text-[#0B0D10] shadow-[0_0_20px_rgba(123,198,255,0.08)] transition-[background-color,border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-white/25 hover:bg-white hover:shadow-[0_0_26px_rgba(123,198,255,0.14)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7BC6FF]/15 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 md:h-[42px] md:w-[42px]"
               >
@@ -2015,13 +2105,11 @@ function App() {
                       : 'Selección manual'}
                   </span>
                 </div>
-                {route?.inputType && route.inputType !== 'Texto' && (
-                  <div className="mt-1.5 flex items-center gap-2 text-[9px] uppercase tracking-[0.14em]">
-                    <span className="text-white/25">Entrada</span>
-                    <span className="h-px w-3 bg-white/[0.08]" />
-                    <span className="normal-case tracking-normal text-white/45">{route.inputType}</span>
-                  </div>
-                )}
+                <div className="mt-1.5 flex items-center gap-2 text-[9px] uppercase tracking-[0.14em]">
+                  <span className="text-white/25">Entrada</span>
+                  <span className="h-px w-3 bg-white/[0.08]" />
+                  <span className="normal-case tracking-normal text-white/45">{detectedInputType}</span>
+                </div>
               </div>
 
               <OptiRouteMascot

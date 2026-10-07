@@ -30,12 +30,14 @@ body {
 }
 
 .composer-shell {
-  padding: 14px;
+  min-height: 88px;
+  padding: 8px 16px;
   border-color: rgba(214, 162, 74, 0.075);
   background-image: radial-gradient(circle at 88% 110%, rgba(214, 162, 74, 0.035), transparent 34%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
     0 18px 55px rgba(0, 0, 0, 0.24);
+  transition: min-height 180ms ease, padding 180ms ease, border-color 200ms ease, box-shadow 200ms ease;
 }
 
 .composer-shell--dragging {
@@ -65,9 +67,9 @@ body {
 
 .attachment-button {
   display: inline-flex;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
   align-items: center;
   justify-content: center;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -78,8 +80,8 @@ body {
 }
 
 .attachment-button svg {
-  width: 17px;
-  height: 17px;
+  width: 14px;
+  height: 14px;
 }
 
 .attachment-button:hover {
@@ -101,7 +103,7 @@ body {
 .draft-attachments {
   display: flex;
   gap: 8px;
-  margin: 0 0 11px;
+  margin: 10px 0 0;
   padding: 2px 2px 5px;
   overflow-x: auto;
   scrollbar-width: thin;
@@ -211,7 +213,7 @@ body {
 }
 
 .attachment-error {
-  margin: -2px 2px 10px;
+  margin: 8px 2px 0;
   color: rgba(214, 162, 74, 0.74);
   font-size: 10px;
   line-height: 1.45;
@@ -222,16 +224,41 @@ body {
   line-height: 1.6;
 }
 
+.composer-shell .composer-textarea {
+  height: auto;
+  min-height: 24px;
+  max-height: 210px;
+  line-height: 1.5;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  transition: height 160ms ease;
+}
+
+.composer-toolbar {
+  margin-top: 6px;
+}
+
 .composer-shell textarea::placeholder {
   color: #858b94;
   opacity: 0.82;
 }
 
 .model-picker > button[aria-haspopup='listbox'] {
-  min-height: 38px;
-  padding-right: 13px;
-  padding-left: 13px;
-  font-size: 12.5px;
+  height: 34px;
+  min-height: 34px;
+  padding-right: 11px;
+  padding-left: 11px;
+  font-size: 12px;
+}
+
+.model-picker > button[aria-haspopup='listbox'] > span:first-child {
+  font-size: 13px;
+}
+
+.model-picker > button[aria-haspopup='listbox'] > svg {
+  width: 11px;
+  height: 11px;
 }
 
 .model-picker__popover {
@@ -386,6 +413,57 @@ body {
   z-index: -1;
   pointer-events: none;
   background: radial-gradient(circle at 28% 38%, rgba(123, 198, 255, 0.025), transparent 58%);
+}
+
+.chat-context-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  margin-bottom: 28px;
+}
+
+.chat-conversation-area {
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-hero {
+  display: grid;
+  grid-template-rows: 0fr;
+  margin-bottom: 0;
+  pointer-events: none;
+  transition:
+    grid-template-rows 700ms cubic-bezier(0.45, 0, 0.2, 1),
+    margin-bottom 700ms cubic-bezier(0.45, 0, 0.2, 1);
+}
+
+.chat-hero--visible {
+  grid-template-rows: 1fr;
+  margin-bottom: 32px;
+  pointer-events: auto;
+}
+
+.chat-hero__content {
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition:
+    opacity 600ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 700ms cubic-bezier(0.45, 0, 0.2, 1);
+}
+
+.chat-hero--visible .chat-hero__content {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.chat-hero--hidden {
+  pointer-events: none;
+}
+
+.chat-message-stream {
+  padding-top: 32px;
 }
 
 .active-agent-context {
@@ -990,8 +1068,8 @@ body {
     --chat-axis-offset: clamp(72px, 5vw, 96px);
   }
 
-  .chat-column > .chat-heading-glow,
-  .chat-column > .chat-message-stream,
+  .chat-column > .chat-context-header,
+  .chat-column > .chat-conversation-area,
   .chat-column > .composer-shell,
   .chat-column > .quick-prompts {
     width: min(1180px, calc(100% - var(--chat-axis-offset)));
@@ -1625,7 +1703,7 @@ body {
 .conversation-turns {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 32px;
 }
 
 .user-message-row {
@@ -1634,6 +1712,7 @@ body {
   align-self: flex-end;
   justify-content: flex-end;
   min-width: 0;
+  padding-right: clamp(20px, 2vw, 32px);
 }
 
 .user-message-stack {
@@ -1759,8 +1838,21 @@ body {
 }
 
 @media (max-width: 639px) {
+  .composer-shell {
+    min-height: 86px;
+    padding: 8px 12px;
+  }
+
+  .composer-shell .composer-textarea {
+    max-height: 168px;
+  }
+
   .conversation-turns {
-    gap: 26px;
+    gap: 28px;
+  }
+
+  .user-message-row {
+    padding-right: 12px;
   }
 
   .user-message-stack {
@@ -1897,6 +1989,11 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .chat-hero,
+  .chat-hero__content {
+    transition: none;
+  }
+
   .orb-idle,
   .message-enter,
   .route-reveal > *,
